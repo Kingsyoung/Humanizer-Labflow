@@ -1,43 +1,43 @@
-import os
+
+code = '''import os
 import re
 import json
 import random
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 
+# ===== MISTRAL IMPORT FIX =====
+try:
+    from mistralai import Mistral
+except ImportError:
+    try:
+        from mistralai.client import MistralClient as Mistral
+    except ImportError:
+        from mistralai import MistralClient as Mistral
+
+# ===== API KEY =====
+API_KEY = os.getenv("MISTRAL_API_KEY", "")
+if not API_KEY:
+    print("ERROR: No API key. Set MISTRAL_API_KEY environment variable.")
+    exit(1)
+
+client = Mistral(api_key=API_KEY)
+
+# ===== FASTAPI APP (ONLY ONCE) =====
 app = FastAPI(title="Academic Humanizer")
 
+# ===== CORS (ONLY ONCE, ALLOW ALL FOR TESTING) =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Temporary: allow everything for testing
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-from pydantic import BaseModel
-from typing import List, Optional
-try:
-    from mistralai import Mistral
-except ImportError:
-    from mistralai.client import MistralClient as Mistral
 
-import os
-API_KEY = os.getenv("MISTRAL_API_KEY", "")
-if not API_KEY:
-    print("ERROR: No API key")
-    exit(1)
-client = Mistral(api_key=API_KEY)
-app = FastAPI(title="Academic Humanizer")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://https://humanizer-frontend-seven.vercel.app",
-        "https://humanizer-labflow-git-main-growthloom.vercel.app",
-        "http://localhost:3000"
-    ],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ===== MODELS =====
 class SentenceData(BaseModel):
     id: str
     original: str
@@ -62,13 +62,13 @@ class ProcessResponse(BaseModel):
 
 def split_sentences(text):
     """Split text into sentences, preserving citations and abbreviations."""
-    text = re.sub(r"\b(e\.g\.|i\.e\.|et al\.|Fig\.|Dr\.|Prof\.)\s", lambda m: m.group(0).replace(".", "\x00"), text)
-    sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text.strip())
-    return [s.replace("\x00", ".").strip() for s in sents if s.strip()]
+    text = re.sub(r"\\b(e\\.g\\.|i\\.e\\.|et al\\.|Fig\\.|Dr\\.|Prof\\.)\\s", lambda m: m.group(0).replace(".", "\\x00"), text)
+    sents = re.split(r"(?<=[.!?])\\s+(?=[A-Z])", text.strip())
+    return [s.replace("\\x00", ".").strip() for s in sents if s.strip()]
 
 def split_paragraphs(text):
     """Split text into paragraphs, preserving markdown structure."""
-    lines = text.split("\n")
+    lines = text.split("\\n")
     paragraphs = []
     current = []
 
@@ -83,23 +83,11 @@ def split_paragraphs(text):
     if current:
         paragraphs.append(current)
 
-    # Return as list of sentence lists, with metadata about markdown type
     result = []
     for para in paragraphs:
         para_text = " ".join(para)
         result.append(split_sentences(para_text))
     return result
-
-def is_markdown_line(text):
-    """Detect if text is a markdown heading, list item, or other structural element."""
-    stripped = text.strip()
-    if stripped.startswith("#"):
-        return "heading"
-    if stripped.startswith("* ") or stripped.startswith("- "):
-        return "bullet"
-    if stripped.startswith("1.") or stripped.startswith("2.") or re.match(r"^\d+\.", stripped):
-        return "numbered"
-    return None
 
 # ===== SCORING =====
 
@@ -121,7 +109,6 @@ def score_sentence(sent):
     if len(words) > 5 and unique / len(words) < 0.5: score += 10
     for phrase in ["furthermore", "moreover", "in conclusion", "it is important to note", "it is crucial to note", "crucially"]:
         if phrase in s: score += 20
-    # Penalize broken fragments
     if sent.count(",") > 3 or sent.count(";") > 2: score += 15
     if "operating continuously" in s: score += 25
     return min(100, max(0, score))
@@ -131,7 +118,6 @@ def count_words(text):
 
 # ===== LENGTH CONSTRAINTS =====
 
-# VARIED filler phrases - never repeat the same one
 def get_filler_phrase():
     fillers = [
         "a process that occurs automatically.",
@@ -146,7 +132,6 @@ def get_filler_phrase():
     return random.choice(fillers)
 
 def enforce_length_constraint(original, humanized, max_diff=4):
-    """Ensure humanized text stays within word count bounds of original."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
 
@@ -164,18 +149,13 @@ def enforce_length_constraint(original, humanized, max_diff=4):
         return trimmed
 
     if hum_count < orig_count - max_diff:
-        words_needed = orig_count - hum_count
-        if words_needed <= 3:
-            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
-        else:
-            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
+        humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
 
     return humanized
 
 # ===== OBfuscation LAYER =====
 
 def final_obfuscation_layer(text):
-    """Apply subtle linguistic variations. No technique overused."""
     sentences = split_sentences(text)
     processed = []
 
@@ -184,9 +164,7 @@ def final_obfuscation_layer(text):
         if not words:
             continue
 
-        # Only apply to ~30% of sentences, rotate techniques
         if i % 3 == 0 and len(words) > 8:
-            # Swap 1 common word for synonym
             swaps = {
                 "the": ["this", "that"],
                 "is": ["remains", "constitutes"],
@@ -215,19 +193,16 @@ def final_obfuscation_layer(text):
             sent = " ".join(words)
 
         elif i % 3 == 1 and len(words) > 12:
-            # Use semicolon instead of comma (only once)
             if "," in sent:
                 parts = sent.split(",", 1)
                 sent = parts[0] + "; " + parts[1]
 
         elif i % 3 == 2 and len(words) > 10:
-            # Brief parenthetical insertion
             insert_point = min(3, len(words) - 2)
             words.insert(insert_point, "(notably)")
             sent = " ".join(words)
 
-        # Clean up
-        sent = re.sub(r'\s+', ' ', sent).strip()
+        sent = re.sub(r'\\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
             sent += '.'
 
@@ -238,7 +213,6 @@ def final_obfuscation_layer(text):
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text):
-    """Reduce conceptual repetition within paragraphs using n-gram overlap."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -253,18 +227,14 @@ def eliminate_repetition(text):
             bg = words[i].strip(",.!?;:") + " " + words[i+1].strip(",.!?;:")
             bigrams.add(bg)
 
-        # Check overlap with previous sentences
         overlap = len(bigrams & used_bigrams)
         overlap_ratio = overlap / len(bigrams) if bigrams else 0
 
         if overlap_ratio > 0.3 and len(words) > 6:
-            # Compress repetitive sentence
             sent = ' '.join(words[:5]) + "."
 
-        # Add bigrams to used set
         used_bigrams.update(bigrams)
 
-        # Reset every 5 sentences to allow thematic continuation
         if len(processed) > 0 and len(processed) % 5 == 0:
             used_bigrams = set()
 
@@ -275,7 +245,6 @@ def eliminate_repetition(text):
 # ===== BURSTINESS ENGINE =====
 
 def syntactic_burstiness_engine(sentences):
-    """Apply length variation patterns. No em-dashes."""
     if not sentences:
         return sentences
 
@@ -287,7 +256,6 @@ def syntactic_burstiness_engine(sentences):
         current_len = len(words)
 
         if i % 5 == 0:
-            # LONG: expand with embedded clause
             target = int(current_len * 1.3)
             if len(words) < target:
                 expansions = [
@@ -299,24 +267,20 @@ def syntactic_burstiness_engine(sentences):
                 sent = sent.rstrip('.') + random.choice(expansions)
 
         elif i % 5 == 1:
-            # SHORT: compress
             target = max(int(current_len * 0.6), 4)
             if len(words) > target:
                 sent = ' '.join(words[:target]) + '.'
 
         elif i % 5 == 2:
-            # MEDIUM with semicolon
             if ';' not in sent and len(words) > 10:
                 mid = len(words) // 2
                 sent = ' '.join(words[:mid]) + '; ' + ' '.join(words[mid:])
 
         elif i % 5 == 3:
-            # SHORT fragment
             if len(words) > 7:
                 sent = ' '.join(words[:4]) + '.'
 
         elif i % 5 == 4:
-            # LONG with parenthetical
             if len(words) < 18:
                 parentheticals = [
                     " (a requirement that cannot be bypassed).",
@@ -326,12 +290,11 @@ def syntactic_burstiness_engine(sentences):
                 ]
                 sent = sent.rstrip('.') + random.choice(parentheticals)
 
-        sent = re.sub(r'\s+', ' ', sent).strip()
+        sent = re.sub(r'\\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
             sent += '.'
         result.append(sent)
 
-    # Verify total word count
     new_total = sum(count_words(s) for s in result)
     if abs(new_total - total_words) > int(total_words * 0.1):
         diff = new_total - total_words
@@ -345,29 +308,27 @@ def syntactic_burstiness_engine(sentences):
 # ===== LOCAL FALLBACK =====
 
 def local_humanize(sent, index):
-    """Fallback humanization when Mistral fails."""
     words = sent.split()
 
     replacements = {
-        r'\bimportant\b': random.choice(['key', 'critical', 'main']),
-        r'\bplays a critical role\b': random.choice(['is essential', 'is vital', 'serves as']),
-        r'\bplays a vital role\b': random.choice(['is essential', 'is critical', 'serves as']),
-        r'\bis located\b': random.choice(['lies', 'sits', 'is found']),
-        r'\bis composed of\b': random.choice(['contains', 'has', 'includes']),
-        r'\bacts as\b': random.choice(['works as', 'functions as', 'serves as']),
-        r'\bdue to\b': random.choice(['because of', 'owing to', 'as a result of']),
-        r'\boverall\b': random.choice(['in sum', 'taken together', 'collectively']),
-        r'\badditionally\b': random.choice(['also', 'plus', 'further']),
-        r'\bhowever\b': random.choice(['yet', 'though', 'although']),
-        r'\btherefore\b': random.choice(['thus', 'hence', 'so']),
-        r'\bconsequently\b': random.choice(['as a result', 'thereby', 'accordingly']),
+        r'\\bimportant\\b': random.choice(['key', 'critical', 'main']),
+        r'\\bplays a critical role\\b': random.choice(['is essential', 'is vital', 'serves as']),
+        r'\\bplays a vital role\\b': random.choice(['is essential', 'is critical', 'serves as']),
+        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found']),
+        r'\\bis composed of\\b': random.choice(['contains', 'has', 'includes']),
+        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as']),
+        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'as a result of']),
+        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'collectively']),
+        r'\\badditionally\\b': random.choice(['also', 'plus', 'further']),
+        r'\\bhowever\\b': random.choice(['yet', 'though', 'although']),
+        r'\\btherefore\\b': random.choice(['thus', 'hence', 'so']),
+        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'accordingly']),
     }
 
     h = sent
     for pattern, replacement in replacements.items():
         h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
 
-    # Vary sentence starters
     if index % 4 == 0 and not h.startswith('But') and not h.startswith('#') and not h.startswith('*'):
         h = 'But ' + h[0].lower() + h[1:]
     elif index % 4 == 2 and not h.startswith('Yet') and not h.startswith('#') and not h.startswith('*'):
@@ -414,7 +375,7 @@ def humanize_with_mistral(paragraphs, style):
             model="mistral-large-latest",
             messages=[
                 {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": f"Style: {style}\n\nHumanize this academic text:\n\n" + "\n".join(lines)}
+                {"role": "user", "content": f"Style: {style}\\n\\nHumanize this academic text:\\n\\n" + "\\n".join(lines)}
             ],
             temperature=0.7,
             max_tokens=4000,
@@ -463,20 +424,17 @@ def humanize_with_mistral(paragraphs, style):
             if not h:
                 h = local_humanize(orig, j)
 
-            # Apply constraints
             h = enforce_length_constraint(orig, h, max_diff=3)
             para_sentences.append({
-                "orig": orig, 
-                "hum": h, 
+                "orig": orig,
+                "hum": h,
                 "raw_alts": sent.get("alternatives", [])[:3]
             })
 
-        # Apply burstiness at paragraph level
         humanized_only = [s["hum"] for s in para_sentences]
         burstiness_applied = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burstiness_applied)):
-            # Apply obfuscation and repetition elimination
             h = enforce_length_constraint(sent_data["orig"], h, max_diff=4)
             h = final_obfuscation_layer(h)
             h = eliminate_repetition(h)
@@ -484,7 +442,6 @@ def humanize_with_mistral(paragraphs, style):
 
             score = score_sentence(h)
 
-            # Process alternatives
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 if not alt:
@@ -493,7 +450,7 @@ def humanize_with_mistral(paragraphs, style):
                 alt = final_obfuscation_layer(alt)
                 alt = eliminate_repetition(alt)
                 alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
-                alt = re.sub(r'\s+', ' ', alt).strip()
+                alt = re.sub(r'\\s+', ' ', alt).strip()
                 if alt and alt[-1] not in '.!?':
                     alt += '.'
                 clean_alts.append(alt)
@@ -539,4 +496,7 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+'''
+
