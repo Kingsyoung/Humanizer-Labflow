@@ -1,0 +1,316 @@
+import os
+import re
+import json
+import random
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
+from mistralai import Mistral
+
+API_KEY = "UflvGCAqQm3Itpgv2WadHSE82tmJns4d"
+if not API_KEY:
+    print("ERROR: No API key")
+    exit(1)
+
+client = Mistral(api_key=API_KEY)
+app = FastAPI(title="Academic Humanizer")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+class SentenceData(BaseModel):
+    id: str
+    original: str
+    humanized: str
+    alternatives: List[str]
+    score: float
+
+class ParagraphData(BaseModel):
+    id: str
+    sentences: List[SentenceData]
+
+class ProcessRequest(BaseModel):
+    text: str
+    style: Optional[str] = "academic"
+
+class ProcessResponse(BaseModel):
+    processed_paragraphs: List[ParagraphData]
+    total_sentences: int
+    avg_score: float
+
+def protect_citations(text):
+    citation_patterns = [
+        r'\([A-Z][a-z]+(?:\s+et\s+al\.)?,\s*\d{4}[a-z]?\)',
+        r'\[[\d,\s\-]+\]',
+        r'\([A-Z]{2,}(?:\s+et\s+al\.)?,\s*\d{4}\)',
+        r'[A-Z][a-z]+\s*\(\d{4}\)',
+    ]
+    protected_text = text
+    citations = []
+    for pattern in citation_patterns:
+        matches = re.finditer(pattern, protected_text)
+        for match in matches:
+            placeholder = f"__CITE_{len(citations)}__"
+            citations.append(match.group())
+            protected_text = protected_text.replace(match.group(), placeholder, 1)
+    return protected_text, citations
+
+def restore_citations(text, citations):
+    for i, cite in enumerate(citations):
+        text = text.replace(f"__CITE_{i}__", cite)
+    return text
+
+def split_sentences(text):
+    protected_text, citations = protect_citations(text)
+    protected_text = re.sub(r"\b(e\.g\.|i\.e\.|et al\.|Fig\.|Dr\.|Prof\.)\s", lambda m: m.group(0).replace(".", "\x00"), protected_text)
+    sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", protected_text.strip())
+    sents = [s.replace("\x00", ".").strip() for s in sents if s.strip()]
+    final_sents = []
+    for sent in sents:
+        sent = restore_citations(sent, citations)
+        final_sents.append(sent)
+    return final_sents
+
+def split_paragraphs(text):
+    return [split_sentences(p.strip()) for p in text.split("\n\n") if p.strip()]
+
+# EXTENDED BANNED LIST
+AI_TELLS = [
+    "delve", "testament", "pivotal", "moreover", "furthermore", "it is important to note",
+    "it is crucial to note", "in conclusion", "landscape", "tapestry", "beacon", "underscore",
+    "shed light on", "navigate", "ever-evolving", "multifaceted", "intricate", "robust",
+    "leverage", "holistic", "paradigm", "synergy", "stakeholder", "crucially", "underscoring",
+    "a finding that challenges prevailing assumptions", "dialectical", "epistemological",
+    "ontological", "axiomatic", "vicissitudes", "metabolic defiance", "thermodynamic toll",
+    "furnished", "orchestrated", "enacts", "posits", "emerges as a", "underscores the",
+    "highlights the", "serves as a testament", "paints a picture", "weaves a tapestry"
+]
+
+def score_sentence(sent):
+    s, words = sent.lower(), sent.split()
+    score = sum(15 for t in AI_TELLS if t in s)
+    
+    # Length uniformity penalty
+    if 15 <= len(words) <= 22: score += 15
+    elif 12 <= len(words) <= 25: score += 8
+    
+    # Transition starter penalty
+    first = words[0].lower().strip(",.:") if words else ""
+    transition_starters = ["furthermore", "moreover", "however", "therefore", "thus", 
+                          "consequently", "additionally", "crucially", "notably", "significantly"]
+    if first in transition_starters: score += 15
+    
+    # Vocabulary diversity penalty (high diversity = predictable)
+    unique = len(set(w.lower() for w in words))
+    if len(words) > 5:
+        diversity = unique / len(words)
+        if diversity > 0.75: score += 10  # Too diverse = AI-like
+        if diversity < 0.45: score += 8   # Too repetitive
+    
+    # Passive voice density
+    passive = ["is", "are", "was", "were", "be", "been", "being"]
+    passive_count = sum(1 for w in words if w.lower() in passive)
+    if passive_count >= 2 and len(words) < 30: score += 8
+    
+    # Exact phrase matches
+    for phrase in ["furthermore", "moreover", "in conclusion", "it is important to note", 
+                   "it is crucial to note", "crucially", "notably"]:
+        if phrase in s: score += 20
+    
+    return min(100, max(0, score))
+
+def aggressive_anti_detection(text):
+    """Mathematically break AI patterns. This is the nuclear option."""
+    sentences = split_sentences(text)
+    processed = []
+    
+    for i, sent in enumerate(sentences):
+        words = sent.split()
+        
+        # === BURSTINESS ENGINE ===
+        # Force extreme length variation
+        if i % 5 == 0:
+            # Make it LONG and complex
+            if len(words) < 25:
+                sent = sent.rstrip(".") + ", a process that demands substantial energetic investment and precise regulatory coordination across multiple cellular compartments."
+        elif i % 5 == 1:
+            # Make it SHORT and punchy
+            if len(words) > 8:
+                sent = " ".join(words[:5]) + "."
+        elif i % 5 == 2:
+            # Make it MEDIUM with a twist
+            if len(words) < 12:
+                sent = sent.rstrip(".") + "; without this, homeostasis fails."
+        elif i % 5 == 3:
+            # FRAGMENT (humans do this)
+            sent = "Unsustainable otherwise."
+        elif i % 5 == 4:
+            # LONG again but different structure
+            if len(words) < 20:
+                sent = sent.rstrip(".") + ", which—when disrupted—compromises the entire metabolic architecture."
+        
+        # === REMOVE AI TELLS ===
+        sent = sent.replace("a finding that challenges prevailing assumptions in the field", "")
+        sent = sent.replace("a finding that challenges prevailing assumptions", "")
+        sent = sent.replace("a finding that", "")
+        
+        # === NATURAL SWAPS (not ornate) ===
+        natural_swaps = {
+            "important": random.choice(["key", "critical", "main"]),
+            "many": random.choice(["several", "a number of", "multiple"]),
+            "show": random.choice(["show", "demonstrate", "reveal"]),
+            "use": random.choice(["use", "employ"]),
+            "change": random.choice(["change", "shift"]),
+            "maintain": random.choice(["maintain", "keep", "preserve"]),
+            "regulate": random.choice(["regulate", "control", "govern"]),
+            "process": random.choice(["process", "mechanism", "pathway"])
+        }
+        for old, new in natural_swaps.items():
+            if old in sent.lower() and random.random() > 0.5:
+                sent = re.sub(r"\b" + old + r"\b", new, sent, flags=re.IGNORECASE, count=1)
+        
+        # === HUMAN QUIRKS ===
+        # Random em-dash
+        if "," in sent and len(sent.split()) > 12 and random.random() > 0.7:
+            parts = sent.split(",", 1)
+            sent = parts[0] + "—" + parts[1]
+        
+        # Random semicolon
+        if ";" not in sent and len(sent.split()) > 18 and random.random() > 0.6:
+            words = sent.split()
+            mid = len(words) // 2
+            sent = " ".join(words[:mid]) + "; " + " ".join(words[mid:])
+        
+        # Start with conjunction occasionally
+        if i % 3 == 1 and random.random() > 0.5:
+            sent = "But " + sent[0].lower() + sent[1:]
+        elif i % 3 == 2 and random.random() > 0.5:
+            sent = "Yet " + sent[0].lower() + sent[1:]
+        
+        # === CLEANUP ===
+        sent = sent.replace("..", ".").replace(". .", ".")
+        sent = sent.replace("  ", " ")
+        
+        processed.append(sent)
+    
+    return " ".join(processed)
+
+SYSTEM = """You are a senior academic editor. Rewrite text into natural, authoritative scholarly prose.
+
+RULES:
+1. NATURAL VOICE: Write like a professor explaining to students. No thesaurus abuse.
+2. PRESERVE CITATIONS: Keep (Author, 2020), [1], [1-3] exactly as written.
+3. PRESERVE STRUCTURE: Keep headings, numbered lists, bullet points.
+4. BANNED: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, not only...but also, dialectical, epistemological, ontological, axiomatic, vicissitudes, metabolic defiance, thermodynamic toll, furnished, orchestrated, enacts, posits, emerges as a, underscores the, highlights the, serves as a testament, paints a picture, weaves a tapestry
+5. SHORT SENTENCES: Use 5-10 word sentences frequently. Humans write short sentences. AI doesn't.
+6. FRAGMENTS: Use occasional fragments. "A necessary trade-off." "Unsustainable." "Critical."
+7. CONTRACTIONS: Use "don't", "can't", "won't" occasionally. Humans do this.
+8. START WITH CONJUNCTIONS: Start sentences with "But", "Yet", "So", "And".
+9. EM-DASHES: Use for abrupt shifts—like this.
+10. WE/OUR: Use "we found", "our data shows" occasionally.
+
+OUTPUT ONLY JSON:
+{"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
+
+def humanize_with_mistral(paragraphs, style):
+    print(f"CALLING MISTRAL with {len(paragraphs)} paragraphs")
+    lines = []
+    for i, para in enumerate(paragraphs):
+        lines.append(f"Paragraph {i+1}:")
+        for j, s in enumerate(para):
+            lines.append(f"{j+1}. {s}")
+        lines.append("")
+    
+    resp = client.chat.complete(
+        model="mistral-large-latest",
+        messages=[
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": f"Style: {style}\n\nHumanize this academic text:\n\n" + "\n".join(lines)}
+        ],
+        temperature=0.9,
+        max_tokens=4000,
+        response_format={"type": "json_object"}
+    )
+    
+    text = resp.choices[0].message.content
+    print(f"RAW RESPONSE: {text[:200]}...")
+    data = json.loads(text.strip())
+    result = []
+    
+    for i, para in enumerate(data.get("processed_paragraphs", [])):
+        sents = []
+        for j, sent in enumerate(para.get("sentences", [])):
+            h = sent.get("humanized", "")
+            
+            # NUCLEAR OPTION: Aggressive mathematical anti-detection
+            h = aggressive_anti_detection(h)
+            
+            score = score_sentence(h)
+            print(f"  SENTENCE {j}: initial score {score}")
+            
+            # Multiple critic passes if needed
+            attempts = 0
+            while score > 25 and attempts < 3:
+                print(f"    CRITIC PASS {attempts+1}: score {score}")
+                
+                # Surgical feedback based on specific issues
+                issues = []
+                words = h.split()
+                if 12 <= len(words) <= 25:
+                    issues.append("length too uniform")
+                if words[0].lower() in ["the", "this", "these", "that"]:
+                    issues.append("predictable start")
+                if len(set(w.lower() for w in words)) / len(words) > 0.7:
+                    issues.append("vocab too diverse")
+                if ";" not in h and "—" not in h:
+                    issues.append("no punctuation variety")
+                
+                feedback = f"Rewrite. Issues: {', '.join(issues)}. "
+                feedback += "Make it shorter or longer. Add a fragment. Use 'we' or 'but'. Keep citations exact."
+                
+                critic = client.chat.complete(
+                    model="mistral-large-latest",
+                    messages=[
+                        {"role": "system", "content": SYSTEM},
+                        {"role": "user", "content": feedback + "\n\nSentence: " + h}
+                    ],
+                    temperature=0.95,
+                    max_tokens=500
+                )
+                h = critic.choices[0].message.content.strip("\"'\n")
+                h = aggressive_anti_detection(h)
+                score = score_sentence(h)
+                attempts += 1
+                print(f"    NEW SCORE: {score}")
+            
+            sents.append(SentenceData(
+                id=f"p{i}-s{j}",
+                original=sent.get("original", ""),
+                humanized=h,
+                alternatives=sent.get("alternatives", [])[:3],
+                score=score
+            ))
+        result.append(ParagraphData(id=f"para-{i}", sentences=sents))
+    print(f"RETURNING {len(result)} paragraphs")
+    return result
+
+@app.post("/api/process-text", response_model=ProcessResponse)
+async def process(req: ProcessRequest):
+    if not req.text.strip():
+        raise HTTPException(400, "Empty text")
+    pars = split_paragraphs(req.text)
+    processed = humanize_with_mistral(pars, req.style)
+    all_s = [s for p in processed for s in p.sentences]
+    avg = sum(s.score for s in all_s) / len(all_s) if all_s else 0
+    return ProcessResponse(
+        processed_paragraphs=processed,
+        total_sentences=len(all_s),
+        avg_score=round(avg, 1)
+    )
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok", "model": "mistral-large-latest"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
