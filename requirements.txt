@@ -1,5 +1,5 @@
 fastapi
 uvicorn
 pydantic
-mistralai==0.4.2
+groq
 python-multipart
