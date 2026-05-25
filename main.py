@@ -21,13 +21,13 @@ app = FastAPI(title="Academic Humanizer")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://humanizer-labflow.vercel.app",
+        "https://https://humanizer-frontend-seven.vercel.app",
+        "https://humanizer-labflow-git-main-growthloom.vercel.app",
         "http://localhost:3000"
     ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 class SentenceData(BaseModel):
     id: str
     original: str
