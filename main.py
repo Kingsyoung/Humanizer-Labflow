@@ -6,32 +6,22 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
+from mistralai import Mistral
 
-# ===== MISTRAL IMPORT (CORRECT FOR CURRENT PACKAGE VERSION) =====
-from mistralai.client import Mistral
-
-# ===== API KEY FROM ENVIRONMENT =====
 API_KEY = os.getenv("MISTRAL_API_KEY", "")
 if not API_KEY:
     print("ERROR: No API key. Set MISTRAL_API_KEY environment variable.")
     exit(1)
 
-print(f"Mistral API Key loaded: {API_KEY[:8]}...")
 client = Mistral(api_key=API_KEY)
-
-# ===== FASTAPI APP (ONE TIME ONLY) =====
 app = FastAPI(title="Academic Humanizer")
-
-# ===== CORS (ONE TIME ONLY) =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===== MODELS =====
 class SentenceData(BaseModel):
     id: str
     original: str
@@ -52,20 +42,17 @@ class ProcessResponse(BaseModel):
     total_sentences: int
     avg_score: float
 
-# ===== TEXT SPLITTING (PRESERVES MARKDOWN HEADINGS) =====
+# ===== TEXT SPLITTING =====
 
 def split_sentences(text):
-    """Split text into sentences, preserving citations and abbreviations."""
     text = re.sub(r"\b(e\.g\.|i\.e\.|et al\.|Fig\.|Dr\.|Prof\.)\s", lambda m: m.group(0).replace(".", "\x00"), text)
     sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text.strip())
     return [s.replace("\x00", ".").strip() for s in sents if s.strip()]
 
 def split_paragraphs(text):
-    """Split text into paragraphs, preserving markdown structure."""
     lines = text.split("\n")
     paragraphs = []
     current = []
-
     for line in lines:
         stripped = line.strip()
         if not stripped:
@@ -76,7 +63,6 @@ def split_paragraphs(text):
             current.append(stripped)
     if current:
         paragraphs.append(current)
-
     result = []
     for para in paragraphs:
         para_text = " ".join(para)
@@ -84,11 +70,9 @@ def split_paragraphs(text):
     return result
 
 def is_markdown_heading(text):
-    """Check if text is a markdown heading."""
     return text.strip().startswith("#")
 
 def is_markdown_list(text):
-    """Check if text is a markdown list item."""
     stripped = text.strip()
     return stripped.startswith("* ") or stripped.startswith("- ") or re.match(r"^\d+\.", stripped)
 
@@ -99,8 +83,7 @@ AI_TELLS = ["delve", "testament", "pivotal", "moreover", "furthermore", "it is i
             "shed light on", "navigate", "ever-evolving", "multifaceted", "intricate", "robust",
             "leverage", "holistic", "paradigm", "synergy", "stakeholder", "crucially", "underscoring",
             "operating continuously without conscious oversight", "this structure", "that structure",
-            "the present", "the indicated", "the respective", "it is worth noting", "as mentioned earlier",
-            "it should be noted", "indeed", "arguably", "significantly"]
+            "the present", "the indicated", "the respective"]
 
 def score_sentence(sent):
     s, words = sent.lower(), sent.split()
@@ -113,33 +96,17 @@ def score_sentence(sent):
     if len(words) > 5 and unique / len(words) < 0.5: score += 10
     for phrase in ["furthermore", "moreover", "in conclusion", "it is important to note", "it is crucial to note", "crucially"]:
         if phrase in s: score += 20
-    # Penalize broken fragments
     if sent.count(",") > 3 or sent.count(";") > 2: score += 15
     if "operating continuously" in s: score += 25
-    # Penalize very short broken sentences
-    if len(words) < 4 and not sent.startswith("#") and not sent.startswith("*"): score += 20
     return min(100, max(0, score))
 
 def count_words(text):
     return len(text.split())
 
-# ===== LENGTH CONSTRAINTS =====
+# ===== LENGTH CONSTRAINTS (FIXED - NO FILLER SPAM) =====
 
-def get_filler_phrase():
-    fillers = [
-        "a process that occurs automatically.",
-        "this happens without voluntary input.",
-        "such activity proceeds reflexively.",
-        "the mechanism functions autonomously.",
-        "this operates below conscious awareness.",
-        "the response is involuntary.",
-        "such control is automatic.",
-        "the process remains unconscious."
-    ]
-    return random.choice(fillers)
-
-def enforce_length_constraint(original, humanized, max_diff=3):
-    """Strict length enforcement with truncation/expansion."""
+def enforce_length_constraint(original, humanized, max_diff=4):
+    """Ensure humanized text stays within word count bounds. NO filler injection."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
 
@@ -148,33 +115,24 @@ def enforce_length_constraint(original, humanized, max_diff=3):
 
     if hum_count > orig_count + max_diff:
         words = humanized.split()
+        # Keep enough words to be grammatically complete
         keep = max(orig_count + max_diff - 1, min(orig_count, len(words)))
+        # Don't cut mid-clause - find last complete phrase
         trimmed = " ".join(words[:keep])
+        # Ensure it ends with proper punctuation
         if trimmed[-1] in ',;—':
             trimmed = trimmed[:-1]
         if trimmed[-1] not in '.!?':
             trimmed += '.'
         return trimmed
 
-    if hum_count < orig_count - max_diff:
-        humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
-
+    # If too short, return as-is (don't inject fillers that break meaning)
     return humanized
 
-def validate_and_correct_length(original, humanized, max_diff=3):
-    """Validate length and return corrected if needed."""
-    orig_count = count_words(original)
-    hum_count = count_words(humanized)
-
-    if abs(orig_count - hum_count) <= max_diff:
-        return humanized
-
-    return enforce_length_constraint(original, humanized, max_diff)
-
-# ===== SMART OBfuscation (GRAMMAR-AWARE) =====
+# ===== SMART OBfuscation (GRAMMAR-AWARE, NO FORCED SWAPS) =====
 
 def final_obfuscation_layer(text):
-    """Apply subtle linguistic variations. Grammar-aware, no forced swaps."""
+    """Apply subtle linguistic variations. Grammar-aware only."""
     sentences = split_sentences(text)
     processed = []
 
@@ -183,44 +141,52 @@ def final_obfuscation_layer(text):
         if not words:
             continue
 
-        # SKIP obfuscation for short or complex sentences
-        if len(words) < 6:
+        # SKIP: headings, lists, short sentences
+        if len(words) < 6 or is_markdown_heading(sent) or is_markdown_list(sent):
             processed.append(sent)
             continue
 
         # Only apply 1 technique per sentence, based on position
-        technique = i % 4
+        technique = i % 3
+        modified = False
 
-        if technique == 0 and len(words) > 10:
-            # SEMICOLON: Replace first comma with semicolon (only if grammatically sound)
-            if "," in sent and len(words) > 12:
-                # Find a comma that separates two independent clauses
+        if technique == 0 and len(words) > 12:
+            # SEMICOLON: Replace comma with semicolon ONLY between independent clauses
+            if "," in sent:
                 parts = sent.split(",", 1)
-                if len(parts[0].split()) >= 5 and len(parts[1].split()) >= 5:
-                    sent = parts[0] + "; " + parts[1].strip()
+                left_words = len(parts[0].split())
+                right_words = len(parts[1].split())
+                # Both sides must be substantial (independent clauses)
+                if left_words >= 5 and right_words >= 5:
+                    # Check if right side starts with subject (not preposition)
+                    right_first = parts[1].strip().split()[0].lower()
+                    if right_first not in ["and", "but", "or", "yet", "so", "for", "nor"]:
+                        sent = parts[0] + "; " + parts[1].strip()
+                        modified = True
 
-        elif technique == 1 and len(words) > 8:
-            # PARENTHETICAL: Add brief parenthetical after a noun phrase
-            # Only insert after common nouns, not after verbs or prepositions
-            insert_candidates = []
-            for idx, word in enumerate(words):
+        elif technique == 1 and len(words) > 10:
+            # PARENTHETICAL: Add after specific noun types only
+            # Find a good insertion point after an anatomical/technical noun
+            noun_positions = []
+            for idx, word in enumerate(words[:-1]):  # Not last word
                 clean = word.lower().strip(",.!?;:")
-                # Only insert after anatomical/technical nouns
                 if clean in ["cerebellum", "medulla", "pons", "cortex", "tracts", 
                             "nuclei", "nerves", "arteries", "pyramids", "olives",
-                            "structure", "organ", "system", "pathway", "mechanism"]:
-                    insert_candidates.append(idx)
+                            "structure", "organ", "system", "pathway", "mechanism",
+                            "hormone", "testosterone", "spermatogenesis", "pituitary",
+                            "hypothalamus", "testes", "tubules", "cells"]:
+                    noun_positions.append(idx)
 
-            if insert_candidates:
-                insert_point = random.choice(insert_candidates) + 1
+            if noun_positions:
+                insert_point = random.choice(noun_positions) + 1
                 if insert_point < len(words) - 1:
                     words.insert(insert_point, "(notably)")
                     sent = " ".join(words)
+                    modified = True
 
         elif technique == 2 and len(words) > 12:
-            # SENTENCE FRAGMENT: Split long sentence into fragment + sentence
-            # Only if there's a natural break point after a prepositional phrase
-            break_words = ["which", "where", "when", "while", "although"]
+            # SENTENCE FRAGMENT: Split at natural break point only
+            break_words = ["which", "where", "when", "while", "although", "because", "since"]
             for idx, word in enumerate(words):
                 if word.lower() in break_words and idx > 3 and idx < len(words) - 4:
                     fragment = " ".join(words[:idx]) + ". "
@@ -228,19 +194,8 @@ def final_obfuscation_layer(text):
                     if remainder[0].islower():
                         remainder = remainder[0].upper() + remainder[1:]
                     sent = fragment + remainder
+                    modified = True
                     break
-
-        elif technique == 3 and len(words) > 10:
-            # COMPOUND SPLIT: Replace "and" with adverbial phrase (sparingly)
-            if " and " in sent:
-                # Only replace if "and" connects two clauses, not simple nouns
-                and_pos = sent.find(" and ")
-                before = sent[:and_pos].strip()
-                after = sent[and_pos+5:].strip()
-                if len(before.split()) > 4 and len(after.split()) > 4:
-                    # Check if both sides have verbs (clauses, not noun lists)
-                    if any(v in before.lower() for v in ["is", "are", "was", "were", "has", "have", "controls", "regulates"]):
-                        sent = sent.replace(" and ", ", consequently, ", 1)
 
         # Clean up
         sent = re.sub(r'\s+', ' ', sent).strip()
@@ -254,7 +209,6 @@ def final_obfuscation_layer(text):
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text):
-    """Reduce conceptual repetition within paragraphs using n-gram overlap."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -269,18 +223,14 @@ def eliminate_repetition(text):
             bg = words[i].strip(",.!?;:") + " " + words[i+1].strip(",.!?;:")
             bigrams.add(bg)
 
-        # Check overlap with previous sentences
         overlap = len(bigrams & used_bigrams)
         overlap_ratio = overlap / len(bigrams) if bigrams else 0
 
         if overlap_ratio > 0.3 and len(words) > 6:
-            # Compress repetitive sentence
             sent = ' '.join(words[:5]) + "."
 
-        # Add bigrams to used set
         used_bigrams.update(bigrams)
 
-        # Reset every 5 sentences to allow thematic continuation
         if len(processed) > 0 and len(processed) % 5 == 0:
             used_bigrams = set()
 
@@ -288,10 +238,10 @@ def eliminate_repetition(text):
 
     return " ".join(processed)
 
-# ===== BURSTINESS ENGINE =====
+# ===== BURSTINESS ENGINE (FIXED - NO FILLER INJECTION) =====
 
 def syntactic_burstiness_engine(sentences):
-    """Apply length variation patterns. No em-dashes."""
+    """Apply length variation patterns. NO filler phrases injected."""
     if not sentences:
         return sentences
 
@@ -302,45 +252,56 @@ def syntactic_burstiness_engine(sentences):
         words = sent.split()
         current_len = len(words)
 
+        # SKIP markdown elements
+        if is_markdown_heading(sent) or is_markdown_list(sent):
+            result.append(sent)
+            continue
+
         if i % 5 == 0:
-            # LONG: expand with embedded clause
+            # LONG: expand with embedded clause (natural academic extension)
             target = int(current_len * 1.3)
-            if len(words) < target:
-                expansions = [
-                    " through integrated feedback loops.",
-                    " via polysynaptic pathways.",
-                    " under homeostatic regulation.",
-                    " through descending cortical input."
+            if len(words) < target and len(words) > 8:
+                # Add a natural relative clause
+                extensions = [
+                    ", which reflects its complex organizational structure",
+                    ", a process that occurs under normal physiological conditions",
+                    ", thereby maintaining homeostatic regulation",
+                    ", an integration that occurs through polysynaptic pathways"
                 ]
-                sent = sent.rstrip('.') + random.choice(expansions)
+                sent = sent.rstrip('.') + random.choice(extensions) + '.'
 
         elif i % 5 == 1:
-            # SHORT: compress
-            target = max(int(current_len * 0.6), 4)
-            if len(words) > target:
+            # SHORT: compress to punchy statement
+            target = max(int(current_len * 0.6), 5)
+            if len(words) > target and len(words) > 8:
+                # Keep first part, make it a complete thought
                 sent = ' '.join(words[:target]) + '.'
 
         elif i % 5 == 2:
-            # MEDIUM with semicolon
+            # MEDIUM with semicolon (if grammatically sound)
             if ';' not in sent and len(words) > 10:
                 mid = len(words) // 2
-                sent = ' '.join(words[:mid]) + '; ' + ' '.join(words[mid:])
+                left = ' '.join(words[:mid])
+                right = ' '.join(words[mid:])
+                # Only use semicolon if both sides are substantial
+                if len(left.split()) >= 4 and len(right.split()) >= 4:
+                    sent = left + '; ' + right
 
         elif i % 5 == 3:
-            # SHORT fragment
-            if len(words) > 7:
+            # SHORT fragment (only for non-technical sentences)
+            if len(words) > 8 and not any(t in sent.lower() for t in ["hormone", "testosterone", "spermatogenesis", "pituitary"]):
                 sent = ' '.join(words[:4]) + '.'
 
         elif i % 5 == 4:
-            # LONG with parenthetical
-            if len(words) < 18:
+            # LONG with parenthetical (natural placement)
+            if len(words) < 18 and len(words) > 10:
                 parentheticals = [
-                    " (a requirement that cannot be bypassed).",
-                    " (this occurs involuntarily).",
-                    " (under normal physiological conditions).",
-                    " (a process essential for survival)."
+                    " (a requirement that cannot be bypassed)",
+                    " (this occurs involuntarily)",
+                    " (under normal physiological conditions)",
+                    " (a process essential for survival)"
                 ]
-                sent = sent.rstrip('.') + random.choice(parentheticals)
+                sent = sent.rstrip('.') + random.choice(parentheticals) + '.'
 
         sent = re.sub(r'\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
@@ -354,13 +315,12 @@ def syntactic_burstiness_engine(sentences):
         if diff > 0:
             longest_idx = max(range(len(result)), key=lambda i: count_words(result[i]))
             words = result[longest_idx].split()
-            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 3)]) + '.'
+            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 5)]) + '.'
 
     return result
 
-# ===== LOCAL FALLBACK (IMPROVED — actually transforms text) =====
+# ===== LOCAL FALLBACK (IMPROVED - NO FORCED BUT/YET) =====
 
-# Natural academic sentence starters
 SENTENCE_STARTERS = [
     "Interestingly, ", "Notably, ", "In practice, ", "Under these conditions, ",
     "Specifically, ", "In effect, ", "Conversely, ", "As expected, ",
@@ -369,12 +329,9 @@ SENTENCE_STARTERS = [
 ]
 
 def local_humanize(sent, index):
-    """Fallback when Mistral fails. Actually transforms the text."""
+    """Fallback when Mistral fails."""
     words = sent.split()
-    if not words:
-        return sent
 
-    # Step 1: Word replacements (24 patterns)
     replacements = {
         r'\bimportant\b': random.choice(['key', 'critical', 'main', 'essential']),
         r'\bplays a critical role\b': random.choice(['is essential', 'is vital', 'serves as']),
@@ -405,28 +362,18 @@ def local_humanize(sent, index):
     for pattern, replacement in replacements.items():
         h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
 
-    # Step 2: Sentence structure variations
-    if index % 3 == 0 and len(words) > 8:
-        h = ' '.join(words[:6]) + '.'
-    elif index % 3 == 1 and len(words) < 10:
-        h = h.rstrip('.') + ', which remains essential for proper function.'
-    elif index % 3 == 2 and ',' in h:
-        h = h.replace(',', ';', 1)
-
-    # Step 3: Natural academic sentence starter
+    # Natural sentence starters (not forced But/Yet)
     if index % 7 == 0 and len(words) > 5 and not h.startswith('#') and not h.startswith('*'):
         starter = random.choice(SENTENCE_STARTERS)
         first_char = h[0]
         if first_char.isupper():
             h = starter + first_char.lower() + h[1:]
-        else:
-            h = starter + h
 
     return h
 
-# ===== SYSTEM PROMPT (ELITE ACADEMIC EDITOR) =====
+# ===== SYSTEM PROMPT =====
 
-SYSTEM = """You are an elite academic editor specializing in neuroanatomy and biomedical sciences. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
+SYSTEM = """You are an elite academic editor specializing in reproductive medicine and endocrinology. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
 
 CRITICAL ARCHITECTURAL CONSTRAINTS:
 
@@ -442,7 +389,7 @@ CRITICAL ARCHITECTURAL CONSTRAINTS:
 - Alternate: Long (28-35 words) → Short (5-8 words) → Medium (12-18) → Short (4-7) → Long (25-30).
 
 3. BANNED PHRASES (ZeroGPT triggers)
-NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly
+NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly, operating continuously without conscious oversight, this structure, that structure, the present, the indicated, the respective
 
 4. HUMAN QUIRKS FOR DETECTION BYPASS
 - Use "we" or "our" occasionally (1-2 times per paragraph max).
@@ -454,7 +401,7 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 
 5. REPETITION ELIMINATION
 - Never use the same noun phrase twice in one paragraph.
-- If "the cerebellum" appears in sentence 1, use "this structure," "the respective organ," or "it" in sentence 2.
+- If "clomiphene citrate" appears in sentence 1, use "this agent," "the respective compound," or "it" in sentence 2.
 - Vary verb phrases: "regulates" → "controls" → "governs" → "modulates".
 
 6. CITATION & MARKDOWN PRESERVATION
@@ -465,57 +412,12 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 
 7. ACADEMIC TONE TARGET
 - Write like a tenured professor with 30 years of publishing experience.
-- Use precise terminology: "afferent pathways," "proprioceptive feedback," "vestibulocerebellar tracts."
-- Avoid generic transitions. Each sentence should advance the argument or provide new anatomical detail.
+- Use precise terminology: "hypothalamic-pituitary-gonadal axis," "Sertoli cell function," "seminiferous tubule microenvironment."
+- Avoid generic transitions. Each sentence should advance the argument or provide new mechanistic detail.
 - Use active voice 60% of the time, passive 40%.
 
 OUTPUT ONLY VALID JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
-
-# ===== CORRECTION LOOP FOR LENGTH =====
-
-def correction_loop(original, humanized, max_attempts=2):
-    """Send back to LLM if length is too far off."""
-    orig_count = count_words(original)
-    hum_count = count_words(humanized)
-
-    if abs(orig_count - hum_count) <= 3:
-        return humanized
-
-    for attempt in range(max_attempts):
-        try:
-            correction_prompt = f"""The following rewritten academic sentence violates our strict length constraint.
-Original word count: {orig_count} words.
-Your rewrite count: {hum_count} words.
-
-Original: "{original}"
-Your Rewrite: "{humanized}"
-
-Task: Adjust your rewrite so it matches EXACTLY {orig_count} words (tolerance +/- 2 words). 
-Maintain elite academic cadence and precise terminology. 
-Use the SYNTACTIC COMPRESSION RULE: if original is long, keep it long; if short, keep it short.
-Output ONLY the corrected sentence string, no quotes, no explanation."""
-
-            resp = client.chat.complete(
-                model="mistral-large-latest",
-                messages=[{"role": "user", "content": correction_prompt}],
-                temperature=0.1,
-                max_tokens=200
-            )
-            corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
-            new_count = count_words(corrected)
-
-            if abs(orig_count - new_count) <= 3:
-                return corrected
-
-            humanized = corrected
-            hum_count = new_count
-
-        except Exception as e:
-            print(f"Correction loop attempt {attempt+1} failed: {e}")
-            break
-
-    return enforce_length_constraint(original, humanized, max_diff=3)
 
 # ===== MAIN PROCESSING =====
 
@@ -527,9 +429,6 @@ def humanize_with_mistral(paragraphs, style):
         for j, s in enumerate(para):
             lines.append(f"{j+1}. [{count_words(s)} words] {s}")
         lines.append("")
-
-    data = None
-    mistral_error = None
 
     try:
         resp = client.chat.complete(
@@ -543,7 +442,7 @@ def humanize_with_mistral(paragraphs, style):
             response_format={"type": "json_object"}
         )
         text = resp.choices[0].message.content
-        print(f"RAW: {text[:300]}...")
+        print(f"RAW: {text[:200]}...")
 
         text = text.strip()
         if text.startswith("```json"):
@@ -558,13 +457,8 @@ def humanize_with_mistral(paragraphs, style):
             text = text[start_idx:end_idx+1]
 
         data = json.loads(text)
-        print(f"Mistral JSON parsed successfully")
     except Exception as e:
-        mistral_error = str(e)
-        print(f"Mistral FAILED: {e}")
-
-    if not data or not data.get("processed_paragraphs"):
-        print(f"Using LOCAL FALLBACK. Error was: {mistral_error}")
+        print(f"Mistral failed: {e}")
         data = {
             "processed_paragraphs": [
                 {
@@ -572,11 +466,7 @@ def humanize_with_mistral(paragraphs, style):
                         {
                             "original": s,
                             "humanized": local_humanize(s, j),
-                            "alternatives": [
-                                local_humanize(s, 10),
-                                local_humanize(s, 20),
-                                local_humanize(s, 30)
-                            ]
+                            "alternatives": [local_humanize(s, 10), local_humanize(s, 20), local_humanize(s, 30)]
                         } for j, s in enumerate(para)
                     ]
                 } for para in paragraphs
@@ -593,55 +483,46 @@ def humanize_with_mistral(paragraphs, style):
             if not h:
                 h = local_humanize(orig, j)
 
-            # CORRECTION LOOP: Send back to LLM if length is wrong
-            h = correction_loop(orig, h)
-            h = validate_and_correct_length(orig, h, max_diff=3)
-
+            h = enforce_length_constraint(orig, h, max_diff=3)
             para_sentences.append({"orig": orig, "hum": h, "raw_alts": sent.get("alternatives", [])[:3]})
             para_total_original += count_words(orig)
 
-        # Apply burstiness at paragraph level
         humanized_only = [s["hum"] for s in para_sentences]
         burstiness_applied = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burstiness_applied)):
-            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
+            h = enforce_length_constraint(sent_data["orig"], h, max_diff=4)
             h = final_obfuscation_layer(h)
             h = eliminate_repetition(h)
-            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
+            h = enforce_length_constraint(sent_data["orig"], h, max_diff=5)
             score = score_sentence(h)
 
-            # Process alternatives with UNIQUE generation
+            # Process alternatives - ensure unique and not original
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 if not alt:
-                    # Generate truly unique alternative using different seed
                     alt = local_humanize(sent_data["orig"], idx + 100)
-
-                alt = correction_loop(sent_data["orig"], alt)
-                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
+                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=4)
                 alt = final_obfuscation_layer(alt)
                 alt = eliminate_repetition(alt)
-                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
+                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
                 alt = re.sub(r'\s+', ' ', alt).strip()
                 if alt and alt[-1] not in '.!?':
                     alt += '.'
                 clean_alts.append(alt)
 
-            # Ensure 3 unique alternatives that are NOT the original
+            # Ensure 3 unique alternatives, not duplicates of original
             unique_alts = []
             orig_lower = sent_data["orig"].lower().strip()
-
             for alt in clean_alts:
                 alt_lower = alt.lower().strip()
                 if alt_lower != orig_lower and alt_lower not in [a.lower().strip() for a in unique_alts]:
                     unique_alts.append(alt)
 
-            # Generate more if needed
             seed = 200
             while len(unique_alts) < 3:
                 fallback = local_humanize(sent_data["orig"], seed)
-                fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
+                fallback = enforce_length_constraint(sent_data["orig"], fallback, max_diff=3)
                 fallback_lower = fallback.lower().strip()
                 if fallback_lower != orig_lower and fallback_lower not in [a.lower().strip() for a in unique_alts]:
                     unique_alts.append(fallback)
