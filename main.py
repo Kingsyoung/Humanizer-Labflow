@@ -6,7 +6,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-try:     from mistralai import Mistral except ImportError:     from mistralai.client import MistralClient as Mistral
+try:
+    from mistralai import Mistral
+except ImportError:
+    from mistralai.client import MistralClient as Mistral
 
 API_KEY = os.getenv("UflvGCAqQm3Itpgv2WadHSE82tmJns4d", "")
 if not API_KEY:
