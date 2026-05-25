@@ -1,5 +1,5 @@
 
-import os
+code = '''import os
 import re
 import json
 import random
@@ -11,11 +11,14 @@ from typing import List, Optional
 # ===== MISTRAL IMPORT (handles both old and new package versions) =====
 try:
     from mistralai import Mistral
+    print("Using mistralai.Mistral")
 except ImportError:
     try:
         from mistralai.client import MistralClient as Mistral
+        print("Using mistralai.client.MistralClient")
     except ImportError:
         from mistralai import MistralClient as Mistral
+        print("Using mistralai.MistralClient")
 
 # ===== API KEY FROM ENVIRONMENT =====
 API_KEY = os.getenv("MISTRAL_API_KEY", "")
@@ -23,12 +26,13 @@ if not API_KEY:
     print("ERROR: No API key. Set MISTRAL_API_KEY environment variable.")
     exit(1)
 
+print(f"API Key loaded: {API_KEY[:8]}...")
 client = Mistral(api_key=API_KEY)
 
 # ===== FASTAPI APP (ONE TIME ONLY) =====
 app = FastAPI(title="Academic Humanizer")
 
-# ===== CORS (ONE TIME ONLY — ALLOW ALL FOR TESTING) =====
+# ===== CORS (ONE TIME ONLY) =====
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -286,46 +290,71 @@ def syntactic_burstiness_engine(sentences):
 
     return result
 
-# ===== LOCAL FALLBACK =====
-
-# BETTER sentence starters — varied and natural, not forced "But"/"Yet"
-SENTENCE_STARTERS = [
-    "Interestingly, ", "Notably, ", "In practice, ", "Under these conditions, ",
-    "Specifically, ", "In effect, ", "Conversely, ", "As expected, ",
-    "In this context, ", "Evidently, ", "Consequently, ", "Alternatively, ",
-    "In particular, ", "By comparison, ", "In such cases, ", "Naturally, "
-]
+# ===== LOCAL FALLBACK (IMPROVED — actually transforms text) =====
 
 def local_humanize(sent, index):
+    """Fallback when Mistral fails. Actually transforms the text, not just echoes it."""
     words = sent.split()
+    if not words:
+        return sent
+
+    # Step 1: Word replacements
     replacements = {
-        r'\\bimportant\\b': random.choice(['key', 'critical', 'main']),
+        r'\\bimportant\\b': random.choice(['key', 'critical', 'main', 'essential']),
         r'\\bplays a critical role\\b': random.choice(['is essential', 'is vital', 'serves as']),
         r'\\bplays a vital role\\b': random.choice(['is essential', 'is critical', 'serves as']),
-        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found']),
-        r'\\bis composed of\\b': random.choice(['contains', 'has', 'includes']),
-        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as']),
-        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'as a result of']),
-        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'collectively']),
-        r'\\badditionally\\b': random.choice(['also', 'plus', 'further']),
-        r'\\bhowever\\b': random.choice(['yet', 'though', 'although']),
-        r'\\btherefore\\b': random.choice(['thus', 'hence', 'so']),
-        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'accordingly']),
+        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found', 'is situated']),
+        r'\\bis composed of\\b': random.choice(['contains', 'has', 'includes', 'comprises']),
+        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as', 'operates as']),
+        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'as a result of', 'stemming from']),
+        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'collectively', 'broadly']),
+        r'\\badditionally\\b': random.choice(['also', 'plus', 'further', 'moreover']),
+        r'\\bhowever\\b': random.choice(['yet', 'though', 'although', 'nevertheless']),
+        r'\\btherefore\\b': random.choice(['thus', 'hence', 'so', 'accordingly']),
+        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'accordingly', 'hence']),
+        r'\\bregulates\\b': random.choice(['controls', 'governs', 'modulates', 'directs']),
+        r'\\bcontains\\b': random.choice(['holds', 'possesses', 'encompasses', 'incorporates']),
+        r'\\bresponsible for\\b': random.choice(['accountable for', 'charged with', 'tasked with']),
+        r'\\bassociated with\\b': random.choice(['linked to', 'tied to', 'connected with', 'related to']),
+        r'\\binvolved in\\b': random.choice(['engaged in', 'participating in', 'taking part in']),
+        r'\\bconsists of\\b': random.choice(['comprises', 'is made up of', 'incorporates']),
+        r'\\bpart of\\b': random.choice(['component of', 'element of', 'constituent of']),
+        r'\\bfunction\\b': random.choice(['role', 'purpose', 'operation', 'activity']),
+        r'\\bstructure\\b': random.choice(['anatomy', 'architecture', 'framework', 'morphology']),
+        r'\\bprocess\\b': random.choice(['mechanism', 'procedure', 'pathway', 'sequence']),
+        r'\\bcontrol\\b': random.choice(['regulation', 'management', 'oversight', 'direction']),
     }
+
     h = sent
     for pattern, replacement in replacements.items():
         h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
 
-    # Varied sentence starters instead of forced "But"/"Yet"
-    if index % 5 == 1 and len(words) > 12:
-        h = ' '.join(words[:7]) + '.'
-    elif index % 5 == 2 and len(words) < 8:
-        h = h.rstrip('.') + '; this is non-negotiable.'
-    if index % 4 == 0 and ',' in h:
+    # Step 2: Sentence structure variations
+    if index % 3 == 0 and len(words) > 8:
+        # Compress to fragment
+        h = ' '.join(words[:6]) + '.'
+    elif index % 3 == 1 and len(words) < 10:
+        # Expand with clause
+        h = h.rstrip('.') + ', which remains essential for proper function.'
+    elif index % 3 == 2 and ',' in h:
+        # Semicolon swap
         h = h.replace(',', ';', 1)
-    if index % 7 == 0 and not h.startswith('#') and not h.startswith('*') and len(words) > 5:
-        starter = random.choice(SENTENCE_STARTERS)
-        h = starter + h[0].lower() + h[1:]
+
+    # Step 3: Sentence starter variation (natural academic)
+    starters = ["Interestingly, ", "Notably, ", "Specifically, ", "In effect, ", 
+                "Conversely, ", "Evidently, ", "Consequently, ", "Alternatively, ",
+                "In particular, ", "By comparison, ", "Naturally, ", "In practice, "
+    ]
+    
+    if index % 5 == 0 and len(words) > 5 and not h.startswith('#') and not h.startswith('*'):
+        # Only apply to some sentences, not all
+        starter = random.choice(starters)
+        # Make sure we lowercase the first letter of original
+        first_char = h[0]
+        if first_char.isupper():
+            h = starter + first_char.lower() + h[1:]
+        else:
+            h = starter + h
 
     return h
 
@@ -341,7 +370,7 @@ CRITICAL RULES:
 5. PRESERVE CITATIONS: Keep (Author, 2020), [1], [1-3] exactly.
 6. PRESERVE STRUCTURE: Keep headings, numbered lists, bullet points.
 7. BANNED: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note
-8. HUMAN QUIRKS: Use "we" occasionally. Start with "But", "Yet" ONLY when it flows naturally. Use fragments. Use semicolons; like this.
+8. HUMAN QUIRKS: Use "we" occasionally. Start with "But", "Yet" ONLY when natural. Use fragments. Use semicolons; like this.
 9. NEVER REPEAT: Don't use the same phrase twice in one paragraph.
 10. WORD COUNT: If original is 12 words, output must be 10-15 words. No exceptions.
 
@@ -358,6 +387,10 @@ def humanize_with_mistral(paragraphs, style):
         for j, s in enumerate(para):
             lines.append(f"{j+1}. {s}")
         lines.append("")
+    
+    data = None
+    mistral_error = None
+    
     try:
         resp = client.chat.complete(
             model="mistral-large-latest",
@@ -370,20 +403,29 @@ def humanize_with_mistral(paragraphs, style):
             response_format={"type": "json_object"}
         )
         text = resp.choices[0].message.content
-        print(f"RAW: {text[:150]}...")
+        print(f"RAW: {text[:200]}...")
+        
         text = text.strip()
         if text.startswith("```json"):
             text = text[7:]
         if text.endswith("```"):
             text = text[:-3]
         text = text.strip()
+        
         start_idx = text.find('{')
         end_idx = text.rfind('}')
         if start_idx != -1 and end_idx != -1:
             text = text[start_idx:end_idx+1]
+        
         data = json.loads(text)
+        print(f"Mistral JSON parsed successfully")
     except Exception as e:
-        print(f"Mistral failed: {e}")
+        mistral_error = str(e)
+        print(f"Mistral FAILED: {e}")
+    
+    # If Mistral failed or returned empty, use fallback
+    if not data or not data.get("processed_paragraphs"):
+        print(f"Using LOCAL FALLBACK. Error was: {mistral_error}")
         data = {
             "processed_paragraphs": [
                 {
@@ -474,3 +516,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+'''
