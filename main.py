@@ -6,16 +6,23 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from mistralai import Mistral
+try:     from mistralai import Mistral except ImportError:     from mistralai.client import MistralClient as Mistral
 
-API_KEY = "UflvGCAqQm3Itpgv2WadHSE82tmJns4d"
+API_KEY = os.getenv("UflvGCAqQm3Itpgv2WadHSE82tmJns4d", "")
 if not API_KEY:
     print("ERROR: No API key")
     exit(1)
-
 client = Mistral(api_key=API_KEY)
 app = FastAPI(title="Academic Humanizer")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://humanizer-labflow.vercel.app",
+        "http://localhost:3000"
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class SentenceData(BaseModel):
     id: str
