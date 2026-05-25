@@ -1,23 +1,23 @@
-
 import os
 import re
 import json
 import random
-import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from groq import Groq
+
+# ===== MISTRAL IMPORT (CORRECT FOR CURRENT PACKAGE VERSION) =====
+from mistralai.client import Mistral
 
 # ===== API KEY FROM ENVIRONMENT =====
-API_KEY = os.getenv("GROQ_API_KEY", "")
+API_KEY = os.getenv("MISTRAL_API_KEY", "")
 if not API_KEY:
-    print("ERROR: No API key. Set GROQ_API_KEY environment variable.")
+    print("ERROR: No API key. Set MISTRAL_API_KEY environment variable.")
     exit(1)
 
-print(f"Groq API Key loaded: {API_KEY[:8]}...")
-client = Groq(api_key=API_KEY)
+print(f"Mistral API Key loaded: {API_KEY[:8]}...")
+client = Mistral(api_key=API_KEY)
 
 # ===== FASTAPI APP (ONE TIME ONLY) =====
 app = FastAPI(title="Academic Humanizer")
@@ -52,15 +52,45 @@ class ProcessResponse(BaseModel):
     total_sentences: int
     avg_score: float
 
-# ===== TEXT SPLITTING =====
+# ===== TEXT SPLITTING (PRESERVES MARKDOWN HEADINGS) =====
 
 def split_sentences(text):
-    text = re.sub(r"\\b(e\\.g\\.|i\\.e\\.|et al\\.|Fig\\.|Dr\\.|Prof\\.)\\s", lambda m: m.group(0).replace(".", "\\x00"), text)
-    sents = re.split(r"(?<=[.!?])\\s+(?=[A-Z])", text.strip())
-    return [s.replace("\\x00", ".").strip() for s in sents if s.strip()]
+    """Split text into sentences, preserving citations and abbreviations."""
+    text = re.sub(r"\b(e\.g\.|i\.e\.|et al\.|Fig\.|Dr\.|Prof\.)\s", lambda m: m.group(0).replace(".", "\x00"), text)
+    sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text.strip())
+    return [s.replace("\x00", ".").strip() for s in sents if s.strip()]
 
 def split_paragraphs(text):
-    return [split_sentences(p.strip()) for p in text.split("\\n\\n") if p.strip()]
+    """Split text into paragraphs, preserving markdown structure."""
+    lines = text.split("\n")
+    paragraphs = []
+    current = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if current:
+                paragraphs.append(current)
+                current = []
+        else:
+            current.append(stripped)
+    if current:
+        paragraphs.append(current)
+
+    result = []
+    for para in paragraphs:
+        para_text = " ".join(para)
+        result.append(split_sentences(para_text))
+    return result
+
+def is_markdown_heading(text):
+    """Check if text is a markdown heading."""
+    return text.strip().startswith("#")
+
+def is_markdown_list(text):
+    """Check if text is a markdown list item."""
+    stripped = text.strip()
+    return stripped.startswith("* ") or stripped.startswith("- ") or re.match(r"^\d+\.", stripped)
 
 # ===== SCORING =====
 
@@ -70,7 +100,7 @@ AI_TELLS = ["delve", "testament", "pivotal", "moreover", "furthermore", "it is i
             "leverage", "holistic", "paradigm", "synergy", "stakeholder", "crucially", "underscoring",
             "operating continuously without conscious oversight", "this structure", "that structure",
             "the present", "the indicated", "the respective", "it is worth noting", "as mentioned earlier",
-            "it should be noted", "indeed", "arguably", "notably", "significantly"]
+            "it should be noted", "indeed", "arguably", "significantly"]
 
 def score_sentence(sent):
     s, words = sent.lower(), sent.split()
@@ -83,17 +113,17 @@ def score_sentence(sent):
     if len(words) > 5 and unique / len(words) < 0.5: score += 10
     for phrase in ["furthermore", "moreover", "in conclusion", "it is important to note", "it is crucial to note", "crucially"]:
         if phrase in s: score += 20
-    # Penalize broken fragments and repetition
+    # Penalize broken fragments
     if sent.count(",") > 3 or sent.count(";") > 2: score += 15
     if "operating continuously" in s: score += 25
-    # Penalize short broken sentences
+    # Penalize very short broken sentences
     if len(words) < 4 and not sent.startswith("#") and not sent.startswith("*"): score += 20
     return min(100, max(0, score))
 
 def count_words(text):
     return len(text.split())
 
-# ===== LENGTH CONSTRAINTS WITH CORRECTION LOOP =====
+# ===== LENGTH CONSTRAINTS =====
 
 def get_filler_phrase():
     fillers = [
@@ -112,13 +142,12 @@ def enforce_length_constraint(original, humanized, max_diff=3):
     """Strict length enforcement with truncation/expansion."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
-    
+
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
-    
+
     if hum_count > orig_count + max_diff:
         words = humanized.split()
-        # Keep enough words to match original length
         keep = max(orig_count + max_diff - 1, min(orig_count, len(words)))
         trimmed = " ".join(words[:keep])
         if trimmed[-1] in ',;—':
@@ -126,31 +155,26 @@ def enforce_length_constraint(original, humanized, max_diff=3):
         if trimmed[-1] not in '.!?':
             trimmed += '.'
         return trimmed
-    
+
     if hum_count < orig_count - max_diff:
-        words_needed = orig_count - hum_count
-        if words_needed <= 3:
-            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
-        else:
-            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
-    
+        humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
+
     return humanized
 
 def validate_and_correct_length(original, humanized, max_diff=3):
     """Validate length and return corrected if needed."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
-    
+
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
-    
-    # If too far off, use strict enforcement
+
     return enforce_length_constraint(original, humanized, max_diff)
 
-# ===== FINAL OBfuscation LAYER =====
+# ===== SMART OBfuscation (GRAMMAR-AWARE) =====
 
 def final_obfuscation_layer(text):
-    """Apply subtle linguistic variations. No technique overused."""
+    """Apply subtle linguistic variations. Grammar-aware, no forced swaps."""
     sentences = split_sentences(text)
     processed = []
 
@@ -159,50 +183,67 @@ def final_obfuscation_layer(text):
         if not words:
             continue
 
-        # Only apply to ~30% of sentences, rotate techniques
-        if i % 3 == 0 and len(words) > 8:
-            # Swap 1 common word for synonym
-            swaps = {
-                "the": ["this", "that"],
-                "is": ["remains", "constitutes"],
-                "are": ["constitute", "represent"],
-                "and": ["while", "yet"],
-                "to": ["toward"],
-                "of": ["within"],
-                "in": ["amid"],
-                "for": ["regarding"],
-                "with": ["via"],
-                "by": ["through"],
-                "from": ["originating in"],
-                "as": ["functioning as"],
-            }
-            swap_count = 0
+        # SKIP obfuscation for short or complex sentences
+        if len(words) < 6:
+            processed.append(sent)
+            continue
+
+        # Only apply 1 technique per sentence, based on position
+        technique = i % 4
+
+        if technique == 0 and len(words) > 10:
+            # SEMICOLON: Replace first comma with semicolon (only if grammatically sound)
+            if "," in sent and len(words) > 12:
+                # Find a comma that separates two independent clauses
+                parts = sent.split(",", 1)
+                if len(parts[0].split()) >= 5 and len(parts[1].split()) >= 5:
+                    sent = parts[0] + "; " + parts[1].strip()
+
+        elif technique == 1 and len(words) > 8:
+            # PARENTHETICAL: Add brief parenthetical after a noun phrase
+            # Only insert after common nouns, not after verbs or prepositions
+            insert_candidates = []
             for idx, word in enumerate(words):
                 clean = word.lower().strip(",.!?;:")
-                if clean in swaps and swap_count < 1:
-                    new_word = random.choice(swaps[clean])
-                    if word[0].isupper():
-                        new_word = new_word.capitalize()
-                    if word[-1] in ",.!?;:":
-                        new_word += word[-1]
-                    words[idx] = new_word
-                    swap_count += 1
-            sent = " ".join(words)
+                # Only insert after anatomical/technical nouns
+                if clean in ["cerebellum", "medulla", "pons", "cortex", "tracts", 
+                            "nuclei", "nerves", "arteries", "pyramids", "olives",
+                            "structure", "organ", "system", "pathway", "mechanism"]:
+                    insert_candidates.append(idx)
 
-        elif i % 3 == 1 and len(words) > 12:
-            # Use semicolon instead of comma (only once)
-            if "," in sent:
-                parts = sent.split(",", 1)
-                sent = parts[0] + "; " + parts[1]
+            if insert_candidates:
+                insert_point = random.choice(insert_candidates) + 1
+                if insert_point < len(words) - 1:
+                    words.insert(insert_point, "(notably)")
+                    sent = " ".join(words)
 
-        elif i % 3 == 2 and len(words) > 10:
-            # Brief parenthetical insertion
-            insert_point = min(3, len(words) - 2)
-            words.insert(insert_point, "(notably)")
-            sent = " ".join(words)
+        elif technique == 2 and len(words) > 12:
+            # SENTENCE FRAGMENT: Split long sentence into fragment + sentence
+            # Only if there's a natural break point after a prepositional phrase
+            break_words = ["which", "where", "when", "while", "although"]
+            for idx, word in enumerate(words):
+                if word.lower() in break_words and idx > 3 and idx < len(words) - 4:
+                    fragment = " ".join(words[:idx]) + ". "
+                    remainder = " ".join(words[idx:])
+                    if remainder[0].islower():
+                        remainder = remainder[0].upper() + remainder[1:]
+                    sent = fragment + remainder
+                    break
+
+        elif technique == 3 and len(words) > 10:
+            # COMPOUND SPLIT: Replace "and" with adverbial phrase (sparingly)
+            if " and " in sent:
+                # Only replace if "and" connects two clauses, not simple nouns
+                and_pos = sent.find(" and ")
+                before = sent[:and_pos].strip()
+                after = sent[and_pos+5:].strip()
+                if len(before.split()) > 4 and len(after.split()) > 4:
+                    # Check if both sides have verbs (clauses, not noun lists)
+                    if any(v in before.lower() for v in ["is", "are", "was", "were", "has", "have", "controls", "regulates"]):
+                        sent = sent.replace(" and ", ", consequently, ", 1)
 
         # Clean up
-        sent = re.sub(r'\\s+', ' ', sent).strip()
+        sent = re.sub(r'\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
             sent += '.'
 
@@ -301,7 +342,7 @@ def syntactic_burstiness_engine(sentences):
                 ]
                 sent = sent.rstrip('.') + random.choice(parentheticals)
 
-        sent = re.sub(r'\\s+', ' ', sent).strip()
+        sent = re.sub(r'\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
             sent += '.'
         result.append(sent)
@@ -319,7 +360,7 @@ def syntactic_burstiness_engine(sentences):
 
 # ===== LOCAL FALLBACK (IMPROVED — actually transforms text) =====
 
-# BETTER sentence starters — varied and natural, not forced "But"/"Yet"
+# Natural academic sentence starters
 SENTENCE_STARTERS = [
     "Interestingly, ", "Notably, ", "In practice, ", "Under these conditions, ",
     "Specifically, ", "In effect, ", "Conversely, ", "As expected, ",
@@ -328,36 +369,36 @@ SENTENCE_STARTERS = [
 ]
 
 def local_humanize(sent, index):
-    """Fallback when Groq fails. Actually transforms the text, not just echoes it."""
+    """Fallback when Mistral fails. Actually transforms the text."""
     words = sent.split()
     if not words:
         return sent
 
     # Step 1: Word replacements (24 patterns)
     replacements = {
-        r'\\bimportant\\b': random.choice(['key', 'critical', 'main', 'essential']),
-        r'\\bplays a critical role\\b': random.choice(['is essential', 'is vital', 'serves as']),
-        r'\\bplays a vital role\\b': random.choice(['is essential', 'is critical', 'serves as']),
-        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found', 'is situated']),
-        r'\\bis composed of\\b': random.choice(['contains', 'has', 'includes', 'comprises']),
-        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as', 'operates as']),
-        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'as a result of', 'stemming from']),
-        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'collectively', 'broadly']),
-        r'\\badditionally\\b': random.choice(['also', 'plus', 'further', 'moreover']),
-        r'\\bhowever\\b': random.choice(['yet', 'though', 'although', 'nevertheless']),
-        r'\\btherefore\\b': random.choice(['thus', 'hence', 'so', 'accordingly']),
-        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'accordingly', 'hence']),
-        r'\\bregulates\\b': random.choice(['controls', 'governs', 'modulates', 'directs']),
-        r'\\bcontains\\b': random.choice(['holds', 'possesses', 'encompasses', 'incorporates']),
-        r'\\bresponsible for\\b': random.choice(['accountable for', 'charged with', 'tasked with']),
-        r'\\bassociated with\\b': random.choice(['linked to', 'tied to', 'connected with', 'related to']),
-        r'\\binvolved in\\b': random.choice(['engaged in', 'participating in', 'taking part in']),
-        r'\\bconsists of\\b': random.choice(['comprises', 'is made up of', 'incorporates']),
-        r'\\bpart of\\b': random.choice(['component of', 'element of', 'constituent of']),
-        r'\\bfunction\\b': random.choice(['role', 'purpose', 'operation', 'activity']),
-        r'\\bstructure\\b': random.choice(['anatomy', 'architecture', 'framework', 'morphology']),
-        r'\\bprocess\\b': random.choice(['mechanism', 'procedure', 'pathway', 'sequence']),
-        r'\\bcontrol\\b': random.choice(['regulation', 'management', 'oversight', 'direction']),
+        r'\bimportant\b': random.choice(['key', 'critical', 'main', 'essential']),
+        r'\bplays a critical role\b': random.choice(['is essential', 'is vital', 'serves as']),
+        r'\bplays a vital role\b': random.choice(['is essential', 'is critical', 'serves as']),
+        r'\bis located\b': random.choice(['lies', 'sits', 'is found', 'is situated']),
+        r'\bis composed of\b': random.choice(['contains', 'has', 'includes', 'comprises']),
+        r'\bacts as\b': random.choice(['works as', 'functions as', 'serves as', 'operates as']),
+        r'\bdue to\b': random.choice(['because of', 'owing to', 'as a result of', 'stemming from']),
+        r'\boverall\b': random.choice(['in sum', 'taken together', 'collectively', 'broadly']),
+        r'\badditionally\b': random.choice(['also', 'plus', 'further', 'moreover']),
+        r'\bhowever\b': random.choice(['yet', 'though', 'although', 'nevertheless']),
+        r'\btherefore\b': random.choice(['thus', 'hence', 'so', 'accordingly']),
+        r'\bconsequently\b': random.choice(['as a result', 'thereby', 'accordingly', 'hence']),
+        r'\bregulates\b': random.choice(['controls', 'governs', 'modulates', 'directs']),
+        r'\bcontains\b': random.choice(['holds', 'possesses', 'encompasses', 'incorporates']),
+        r'\bresponsible for\b': random.choice(['accountable for', 'charged with', 'tasked with']),
+        r'\bassociated with\b': random.choice(['linked to', 'tied to', 'connected with', 'related to']),
+        r'\binvolved in\b': random.choice(['engaged in', 'participating in', 'taking part in']),
+        r'\bconsists of\b': random.choice(['comprises', 'is made up of', 'incorporates']),
+        r'\bpart of\b': random.choice(['component of', 'element of', 'constituent of']),
+        r'\bfunction\b': random.choice(['role', 'purpose', 'operation', 'activity']),
+        r'\bstructure\b': random.choice(['anatomy', 'architecture', 'framework', 'morphology']),
+        r'\bprocess\b': random.choice(['mechanism', 'procedure', 'pathway', 'sequence']),
+        r'\bcontrol\b': random.choice(['regulation', 'management', 'oversight', 'direction']),
     }
 
     h = sent
@@ -366,17 +407,14 @@ def local_humanize(sent, index):
 
     # Step 2: Sentence structure variations
     if index % 3 == 0 and len(words) > 8:
-        # Compress to fragment
         h = ' '.join(words[:6]) + '.'
     elif index % 3 == 1 and len(words) < 10:
-        # Expand with clause
         h = h.rstrip('.') + ', which remains essential for proper function.'
     elif index % 3 == 2 and ',' in h:
-        # Semicolon swap
         h = h.replace(',', ';', 1)
 
-    # Step 3: Sentence starter variation (natural academic)
-    if index % 5 == 0 and len(words) > 5 and not h.startswith('#') and not h.startswith('*'):
+    # Step 3: Natural academic sentence starter
+    if index % 7 == 0 and len(words) > 5 and not h.startswith('#') and not h.startswith('*'):
         starter = random.choice(SENTENCE_STARTERS)
         first_char = h[0]
         if first_char.isupper():
@@ -421,8 +459,9 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 
 6. CITATION & MARKDOWN PRESERVATION
 - Keep (Author, 2020), [1], [1-3] exactly as written.
-- Preserve # headings, ## subheadings, * bullet points, 1. numbered lists.
-- Do not turn "## Location" into a sentence.
+- Preserve # headings, ## subheadings, * bullet points, 1. numbered lists EXACTLY.
+- Do not turn "## Location" into a sentence. Do not add periods to headings.
+- Headings must remain as: ## Heading Text (no modification)
 
 7. ACADEMIC TONE TARGET
 - Write like a tenured professor with 30 years of publishing experience.
@@ -439,10 +478,10 @@ def correction_loop(original, humanized, max_attempts=2):
     """Send back to LLM if length is too far off."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
-    
+
     if abs(orig_count - hum_count) <= 3:
         return humanized
-    
+
     for attempt in range(max_attempts):
         try:
             correction_prompt = f"""The following rewritten academic sentence violates our strict length constraint.
@@ -457,32 +496,31 @@ Maintain elite academic cadence and precise terminology.
 Use the SYNTACTIC COMPRESSION RULE: if original is long, keep it long; if short, keep it short.
 Output ONLY the corrected sentence string, no quotes, no explanation."""
 
-            resp = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+            resp = client.chat.complete(
+                model="mistral-large-latest",
                 messages=[{"role": "user", "content": correction_prompt}],
                 temperature=0.1,
                 max_tokens=200
             )
             corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
             new_count = count_words(corrected)
-            
+
             if abs(orig_count - new_count) <= 3:
                 return corrected
-            
-            humanized = corrected  # Try again with this as base
+
+            humanized = corrected
             hum_count = new_count
-            
+
         except Exception as e:
             print(f"Correction loop attempt {attempt+1} failed: {e}")
             break
-    
-    # If all corrections fail, use strict enforcement
+
     return enforce_length_constraint(original, humanized, max_diff=3)
 
 # ===== MAIN PROCESSING =====
 
-def humanize_with_groq(paragraphs, style):
-    print(f"CALLING GROQ with {len(paragraphs)} paragraphs")
+def humanize_with_mistral(paragraphs, style):
+    print(f"CALLING MISTRAL with {len(paragraphs)} paragraphs")
     lines = []
     for i, para in enumerate(paragraphs):
         lines.append(f"Paragraph {i+1}:")
@@ -491,14 +529,14 @@ def humanize_with_groq(paragraphs, style):
         lines.append("")
 
     data = None
-    groq_error = None
+    mistral_error = None
 
     try:
-        resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+        resp = client.chat.complete(
+            model="mistral-large-latest",
             messages=[
                 {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": f"Style: {style}\\n\\nHumanize this academic text. I have marked word counts in [brackets] for each sentence. Match them exactly within +/- 2 words:\\n\\n" + "\\n".join(lines)}
+                {"role": "user", "content": f"Style: {style}\n\nHumanize this academic text. I have marked word counts in [brackets] for each sentence. Match them exactly within +/- 2 words. Preserve all markdown headings (##, ###) and list items (*, 1.) exactly as written:\n\n" + "\n".join(lines)}
             ],
             temperature=0.7,
             max_tokens=4000,
@@ -520,13 +558,13 @@ def humanize_with_groq(paragraphs, style):
             text = text[start_idx:end_idx+1]
 
         data = json.loads(text)
-        print(f"Groq JSON parsed successfully")
+        print(f"Mistral JSON parsed successfully")
     except Exception as e:
-        groq_error = str(e)
-        print(f"Groq FAILED: {e}")
+        mistral_error = str(e)
+        print(f"Mistral FAILED: {e}")
 
     if not data or not data.get("processed_paragraphs"):
-        print(f"Using LOCAL FALLBACK. Error was: {groq_error}")
+        print(f"Using LOCAL FALLBACK. Error was: {mistral_error}")
         data = {
             "processed_paragraphs": [
                 {
@@ -535,9 +573,9 @@ def humanize_with_groq(paragraphs, style):
                             "original": s,
                             "humanized": local_humanize(s, j),
                             "alternatives": [
-                                local_humanize(s, 0),
-                                local_humanize(s, 1),
-                                local_humanize(s, 2)
+                                local_humanize(s, 10),
+                                local_humanize(s, 20),
+                                local_humanize(s, 30)
                             ]
                         } for j, s in enumerate(para)
                     ]
@@ -554,13 +592,11 @@ def humanize_with_groq(paragraphs, style):
             h = sent.get("humanized", "")
             if not h:
                 h = local_humanize(orig, j)
-            
+
             # CORRECTION LOOP: Send back to LLM if length is wrong
             h = correction_loop(orig, h)
-            
-            # Additional strict enforcement
             h = validate_and_correct_length(orig, h, max_diff=3)
-            
+
             para_sentences.append({"orig": orig, "hum": h, "raw_alts": sent.get("alternatives", [])[:3]})
             para_total_original += count_words(orig)
 
@@ -575,42 +611,47 @@ def humanize_with_groq(paragraphs, style):
             h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
             score = score_sentence(h)
 
-            # Process alternatives with correction loop
+            # Process alternatives with UNIQUE generation
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 if not alt:
-                    alt = local_humanize(sent_data["orig"], idx)
-                
-                # Apply correction loop to alternatives too
+                    # Generate truly unique alternative using different seed
+                    alt = local_humanize(sent_data["orig"], idx + 100)
+
                 alt = correction_loop(sent_data["orig"], alt)
                 alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
                 alt = final_obfuscation_layer(alt)
                 alt = eliminate_repetition(alt)
                 alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
-                alt = re.sub(r'\\s+', ' ', alt).strip()
+                alt = re.sub(r'\s+', ' ', alt).strip()
                 if alt and alt[-1] not in '.!?':
                     alt += '.'
                 clean_alts.append(alt)
 
-            # Ensure 3 unique alternatives, not duplicates of original
-            while len(clean_alts) < 3:
-                fallback = local_humanize(sent_data["orig"], len(clean_alts) + 10)
-                fallback = correction_loop(sent_data["orig"], fallback)
+            # Ensure 3 unique alternatives that are NOT the original
+            unique_alts = []
+            orig_lower = sent_data["orig"].lower().strip()
+
+            for alt in clean_alts:
+                alt_lower = alt.lower().strip()
+                if alt_lower != orig_lower and alt_lower not in [a.lower().strip() for a in unique_alts]:
+                    unique_alts.append(alt)
+
+            # Generate more if needed
+            seed = 200
+            while len(unique_alts) < 3:
+                fallback = local_humanize(sent_data["orig"], seed)
                 fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
-                clean_alts.append(fallback)
-            
-            # Remove any duplicates of the original
-            clean_alts = [alt for alt in clean_alts if alt.lower().strip() != sent_data["orig"].lower().strip()]
-            while len(clean_alts) < 3:
-                fallback = local_humanize(sent_data["orig"], len(clean_alts) + 20)
-                fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
-                clean_alts.append(fallback)
+                fallback_lower = fallback.lower().strip()
+                if fallback_lower != orig_lower and fallback_lower not in [a.lower().strip() for a in unique_alts]:
+                    unique_alts.append(fallback)
+                seed += 50
 
             para_sentences[j] = SentenceData(
                 id=f"p{i}-s{j}",
                 original=sent_data["orig"],
                 humanized=h,
-                alternatives=clean_alts[:3],
+                alternatives=unique_alts[:3],
                 score=score
             )
 
@@ -626,7 +667,7 @@ async def process(req: ProcessRequest):
     if not req.text.strip():
         raise HTTPException(400, "Empty text")
     pars = split_paragraphs(req.text)
-    processed = humanize_with_groq(pars, req.style)
+    processed = humanize_with_mistral(pars, req.style)
     all_s = [s for p in processed for s in p.sentences]
     avg = sum(s.score for s in all_s) / len(all_s) if all_s else 0
     return ProcessResponse(
@@ -637,7 +678,7 @@ async def process(req: ProcessRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "model": "llama-3.3-70b-versatile"}
+    return {"status": "ok", "model": "mistral-large-latest"}
 
 if __name__ == "__main__":
     import uvicorn
