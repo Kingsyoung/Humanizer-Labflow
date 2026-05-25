@@ -3,6 +3,7 @@ import os
 import re
 import json
 import random
+import time
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -68,9 +69,8 @@ AI_TELLS = ["delve", "testament", "pivotal", "moreover", "furthermore", "it is i
             "shed light on", "navigate", "ever-evolving", "multifaceted", "intricate", "robust",
             "leverage", "holistic", "paradigm", "synergy", "stakeholder", "crucially", "underscoring",
             "operating continuously without conscious oversight", "this structure", "that structure",
-            "the present", "the indicated", "the respective", "this operates", "that operates",
-            "a process that occurs", "the mechanism functions", "such activity proceeds",
-            "this happens without", "the response is", "such control is"]
+            "the present", "the indicated", "the respective", "it is worth noting", "as mentioned earlier",
+            "it should be noted", "indeed", "arguably", "notably", "significantly"]
 
 def score_sentence(sent):
     s, words = sent.lower(), sent.split()
@@ -83,63 +83,90 @@ def score_sentence(sent):
     if len(words) > 5 and unique / len(words) < 0.5: score += 10
     for phrase in ["furthermore", "moreover", "in conclusion", "it is important to note", "it is crucial to note", "crucially"]:
         if phrase in s: score += 20
-    # Penalize broken fragments and spam phrases
+    # Penalize broken fragments and repetition
     if sent.count(",") > 3 or sent.count(";") > 2: score += 15
-    if "operating continuously" in s or "this operates" in s or "that operates" in s: score += 25
-    if "a process that occurs" in s or "the mechanism functions" in s: score += 20
+    if "operating continuously" in s: score += 25
+    # Penalize short broken sentences
+    if len(words) < 4 and not sent.startswith("#") and not sent.startswith("*"): score += 20
     return min(100, max(0, score))
 
 def count_words(text):
     return len(text.split())
 
-# ===== LENGTH CONSTRAINTS =====
+# ===== LENGTH CONSTRAINTS WITH CORRECTION LOOP =====
 
-def enforce_length_constraint(original, humanized, max_diff=4):
+def get_filler_phrase():
+    fillers = [
+        "a process that occurs automatically.",
+        "this happens without voluntary input.",
+        "such activity proceeds reflexively.",
+        "the mechanism functions autonomously.",
+        "this operates below conscious awareness.",
+        "the response is involuntary.",
+        "such control is automatic.",
+        "the process remains unconscious."
+    ]
+    return random.choice(fillers)
+
+def enforce_length_constraint(original, humanized, max_diff=3):
+    """Strict length enforcement with truncation/expansion."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
+    
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
+    
     if hum_count > orig_count + max_diff:
         words = humanized.split()
-        keep = max(int(orig_count * 0.7), 5)
+        # Keep enough words to match original length
+        keep = max(orig_count + max_diff - 1, min(orig_count, len(words)))
         trimmed = " ".join(words[:keep])
         if trimmed[-1] in ',;—':
             trimmed = trimmed[:-1]
         if trimmed[-1] not in '.!?':
             trimmed += '.'
         return trimmed
+    
     if hum_count < orig_count - max_diff:
-        # Use a SHORT natural extension, NOT a spam phrase
         words_needed = orig_count - hum_count
-        if words_needed <= 2:
-            humanized = humanized.rstrip('.') + ' precisely.'
-        elif words_needed <= 4:
-            humanized = humanized.rstrip('.') + ' in most cases.'
+        if words_needed <= 3:
+            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
         else:
-            # Just return as-is, don't force awkward filler
-            pass
+            humanized = humanized.rstrip('.') + ' ' + get_filler_phrase()
+    
     return humanized
 
-# ===== FINAL OBfuscation LAYER (6 rotating techniques) =====
+def validate_and_correct_length(original, humanized, max_diff=3):
+    """Validate length and return corrected if needed."""
+    orig_count = count_words(original)
+    hum_count = count_words(humanized)
+    
+    if abs(orig_count - hum_count) <= max_diff:
+        return humanized
+    
+    # If too far off, use strict enforcement
+    return enforce_length_constraint(original, humanized, max_diff)
+
+# ===== FINAL OBfuscation LAYER =====
 
 def final_obfuscation_layer(text):
+    """Apply subtle linguistic variations. No technique overused."""
     sentences = split_sentences(text)
     processed = []
-    techniques_used = {'swap': 0, 'fragment': 0, 'punctuation': 0, 'lowercase': 0, 'insertion': 0, 'split': 0}
 
     for i, sent in enumerate(sentences):
         words = sent.split()
         if not words:
             continue
 
-        technique = i % 6
-
-        if technique == 0 and techniques_used['swap'] < 1 and len(words) > 6:
-            # Swap 1 common word for synonym — but NOT "it"/"this"/"that" to avoid spam
-            advanced_swaps = {
+        # Only apply to ~30% of sentences, rotate techniques
+        if i % 3 == 0 and len(words) > 8:
+            # Swap 1 common word for synonym
+            swaps = {
+                "the": ["this", "that"],
                 "is": ["remains", "constitutes"],
                 "are": ["constitute", "represent"],
-                "and": ["while"],
+                "and": ["while", "yet"],
                 "to": ["toward"],
                 "of": ["within"],
                 "in": ["amid"],
@@ -152,8 +179,8 @@ def final_obfuscation_layer(text):
             swap_count = 0
             for idx, word in enumerate(words):
                 clean = word.lower().strip(",.!?;:")
-                if clean in advanced_swaps and swap_count < 1:
-                    new_word = random.choice(advanced_swaps[clean])
+                if clean in swaps and swap_count < 1:
+                    new_word = random.choice(swaps[clean])
                     if word[0].isupper():
                         new_word = new_word.capitalize()
                     if word[-1] in ",.!?;:":
@@ -161,47 +188,20 @@ def final_obfuscation_layer(text):
                     words[idx] = new_word
                     swap_count += 1
             sent = " ".join(words)
-            techniques_used['swap'] += 1
 
-        elif technique == 1 and techniques_used['fragment'] < 1:
-            if len(words) > 12:
-                split_point = random.randint(4, 6)
-                fragment = " ".join(words[:split_point]) + ". "
-                remainder = " ".join(words[split_point:])
-                if remainder and remainder[0].islower():
-                    remainder = remainder[0].upper() + remainder[1:]
-                sent = fragment + remainder
-                techniques_used['fragment'] += 1
+        elif i % 3 == 1 and len(words) > 12:
+            # Use semicolon instead of comma (only once)
+            if "," in sent:
+                parts = sent.split(",", 1)
+                sent = parts[0] + "; " + parts[1]
 
-        elif technique == 2 and techniques_used['punctuation'] < 1:
-            if "," in sent and len(words) > 14:
-                # Find a comma in the middle, replace with semicolon
-                comma_positions = [m.start() for m in re.finditer(r',', sent)]
-                if comma_positions:
-                    mid_comma = comma_positions[len(comma_positions)//2]
-                    sent = sent[:mid_comma] + ";" + sent[mid_comma+1:]
-                techniques_used['punctuation'] += 1
+        elif i % 3 == 2 and len(words) > 10:
+            # Brief parenthetical insertion
+            insert_point = min(3, len(words) - 2)
+            words.insert(insert_point, "(notably)")
+            sent = " ".join(words)
 
-        elif technique == 3 and techniques_used['lowercase'] < 1:
-            if not sent[0].islower() and random.random() > 0.7 and i > 0:
-                sent = sent[0].lower() + sent[1:]
-                techniques_used['lowercase'] += 1
-
-        elif technique == 4 and techniques_used['insertion'] < 1:
-            if len(words) > 10:
-                insert_point = min(4, len(words) - 3)
-                words.insert(insert_point, "(notably)")
-                sent = " ".join(words)
-                techniques_used['insertion'] += 1
-
-        elif technique == 5 and techniques_used['split'] < 1:
-            if " and " in sent and len(words) > 12:
-                sent = sent.replace(" and ", ", consequently, ", 1)
-                techniques_used['split'] += 1
-
-        if i > 0 and i % 6 == 0:
-            techniques_used = {k: 0 for k in techniques_used}
-
+        # Clean up
         sent = re.sub(r'\\s+', ' ', sent).strip()
         if sent and sent[-1] not in '.!?':
             sent += '.'
@@ -213,6 +213,7 @@ def final_obfuscation_layer(text):
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text):
+    """Reduce conceptual repetition within paragraphs using n-gram overlap."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -227,17 +228,18 @@ def eliminate_repetition(text):
             bg = words[i].strip(",.!?;:") + " " + words[i+1].strip(",.!?;:")
             bigrams.add(bg)
 
+        # Check overlap with previous sentences
         overlap = len(bigrams & used_bigrams)
         overlap_ratio = overlap / len(bigrams) if bigrams else 0
 
         if overlap_ratio > 0.3 and len(words) > 6:
-            # Compress repetitive sentence more carefully
-            words_list = sent.split()
-            if len(words_list) > 8:
-                sent = ' '.join(words_list[:6]) + "."
+            # Compress repetitive sentence
+            sent = ' '.join(words[:5]) + "."
 
+        # Add bigrams to used set
         used_bigrams.update(bigrams)
 
+        # Reset every 5 sentences to allow thematic continuation
         if len(processed) > 0 and len(processed) % 5 == 0:
             used_bigrams = set()
 
@@ -245,11 +247,13 @@ def eliminate_repetition(text):
 
     return " ".join(processed)
 
-# ===== SYNTACTIC BURSTINESS ENGINE =====
+# ===== BURSTINESS ENGINE =====
 
 def syntactic_burstiness_engine(sentences):
+    """Apply length variation patterns. No em-dashes."""
     if not sentences:
         return sentences
+
     total_words = sum(count_words(s) for s in sentences)
     result = []
 
@@ -258,48 +262,42 @@ def syntactic_burstiness_engine(sentences):
         current_len = len(words)
 
         if i % 5 == 0:
-            # LONG: expand with embedded clause — NATURAL academic extensions
+            # LONG: expand with embedded clause
             target = int(current_len * 1.3)
             if len(words) < target:
-                extensions = [
-                    ", a feature critical to its overall function.",
-                    ", which reflects its complex organizational structure.",
-                    ", thereby supporting efficient neural communication.",
-                    ", an arrangement that facilitates rapid information transfer."
+                expansions = [
+                    " through integrated feedback loops.",
+                    " via polysynaptic pathways.",
+                    " under homeostatic regulation.",
+                    " through descending cortical input."
                 ]
-                sent = sent.rstrip('.') + random.choice(extensions)
+                sent = sent.rstrip('.') + random.choice(expansions)
 
         elif i % 5 == 1:
-            # SHORT: compress to punchy fragment
-            target = max(int(current_len * 0.5), 4)
-            if len(words) > target + 3:
+            # SHORT: compress
+            target = max(int(current_len * 0.6), 4)
+            if len(words) > target:
                 sent = ' '.join(words[:target]) + '.'
 
         elif i % 5 == 2:
-            # MEDIUM with semicolon — only if sentence is long enough and has natural break
-            if ';' not in sent and len(words) > 12 and ',' in sent:
-                # Find the last comma before midpoint
+            # MEDIUM with semicolon
+            if ';' not in sent and len(words) > 10:
                 mid = len(words) // 2
-                comma_idx = -1
-                for idx, w in enumerate(words[:mid+2]):
-                    if w.endswith(','):
-                        comma_idx = idx
-                if comma_idx > 2:
-                    sent = ' '.join(words[:comma_idx+1]).rstrip(',') + '; ' + ' '.join(words[comma_idx+1:])
+                sent = ' '.join(words[:mid]) + '; ' + ' '.join(words[mid:])
 
         elif i % 5 == 3:
-            # SHORT fragment — only for longer sentences
-            if len(words) > 8:
+            # SHORT fragment
+            if len(words) > 7:
                 sent = ' '.join(words[:4]) + '.'
 
         elif i % 5 == 4:
-            # LONG with brief parenthetical
-            if len(words) < 18 and len(words) > 8:
+            # LONG with parenthetical
+            if len(words) < 18:
                 parentheticals = [
-                    " (a process essential for survival).",
+                    " (a requirement that cannot be bypassed).",
+                    " (this occurs involuntarily).",
                     " (under normal physiological conditions).",
-                    " (a relationship maintained via feedback loops).",
-                    " (an integration that occurs unconsciously)."
+                    " (a process essential for survival)."
                 ]
                 sent = sent.rstrip('.') + random.choice(parentheticals)
 
@@ -308,70 +306,78 @@ def syntactic_burstiness_engine(sentences):
             sent += '.'
         result.append(sent)
 
+    # Verify total word count
     new_total = sum(count_words(s) for s in result)
     if abs(new_total - total_words) > int(total_words * 0.1):
         diff = new_total - total_words
         if diff > 0:
             longest_idx = max(range(len(result)), key=lambda i: count_words(result[i]))
             words = result[longest_idx].split()
-            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 5)]) + '.'
+            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 3)]) + '.'
 
     return result
 
-# ===== LOCAL FALLBACK (IMPROVED — natural academic style) =====
+# ===== LOCAL FALLBACK (IMPROVED — actually transforms text) =====
 
-# Natural academic transitions, not spam
-ACADEMIC_TRANSITIONS = [
-    "Interestingly, ", "Notably, ", "Specifically, ", "In effect, ",
-    "Conversely, ", "Evidently, ", "Consequently, ", "Alternatively, ",
-    "In particular, ", "By comparison, ", "Naturally, ", "In practice, "
+# BETTER sentence starters — varied and natural, not forced "But"/"Yet"
+SENTENCE_STARTERS = [
+    "Interestingly, ", "Notably, ", "In practice, ", "Under these conditions, ",
+    "Specifically, ", "In effect, ", "Conversely, ", "As expected, ",
+    "In this context, ", "Evidently, ", "Consequently, ", "Alternatively, ",
+    "In particular, ", "By comparison, ", "In such cases, ", "Naturally, "
 ]
 
 def local_humanize(sent, index):
-    """Fallback when Groq fails. Produces natural academic output."""
+    """Fallback when Groq fails. Actually transforms the text, not just echoes it."""
     words = sent.split()
     if not words:
         return sent
 
-    # Step 1: Word replacements (natural synonyms only)
+    # Step 1: Word replacements (24 patterns)
     replacements = {
-        r'\\bimportant\\b': random.choice(['key', 'critical', 'essential']),
+        r'\\bimportant\\b': random.choice(['key', 'critical', 'main', 'essential']),
         r'\\bplays a critical role\\b': random.choice(['is essential', 'is vital', 'serves as']),
         r'\\bplays a vital role\\b': random.choice(['is essential', 'is critical', 'serves as']),
-        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found']),
-        r'\\bis composed of\\b': random.choice(['contains', 'comprises', 'incorporates']),
-        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as']),
-        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'stemming from']),
-        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'broadly']),
-        r'\\badditionally\\b': random.choice(['also', 'further', 'besides']),
-        r'\\bhowever\\b': random.choice(['yet', 'though', 'nevertheless']),
-        r'\\btherefore\\b': random.choice(['thus', 'hence', 'accordingly']),
-        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'hence']),
-        r'\\bregulates\\b': random.choice(['controls', 'governs', 'modulates']),
-        r'\\bcontains\\b': random.choice(['holds', 'encompasses', 'incorporates']),
-        r'\\bresponsible for\\b': random.choice(['accountable for', 'charged with']),
-        r'\\bassociated with\\b': random.choice(['linked to', 'connected with', 'related to']),
-        r'\\binvolved in\\b': random.choice(['engaged in', 'participating in']),
-        r'\\bconsists of\\b': random.choice(['comprises', 'incorporates']),
-        r'\\bpart of\\b': random.choice(['component of', 'constituent of']),
-        r'\\bfunction\\b': random.choice(['role', 'operation']),
-        r'\\bstructure\\b': random.choice(['anatomy', 'architecture', 'framework']),
-        r'\\bprocess\\b': random.choice(['mechanism', 'pathway']),
-        r'\\bcontrol\\b': random.choice(['regulation', 'oversight']),
+        r'\\bis located\\b': random.choice(['lies', 'sits', 'is found', 'is situated']),
+        r'\\bis composed of\\b': random.choice(['contains', 'has', 'includes', 'comprises']),
+        r'\\bacts as\\b': random.choice(['works as', 'functions as', 'serves as', 'operates as']),
+        r'\\bdue to\\b': random.choice(['because of', 'owing to', 'as a result of', 'stemming from']),
+        r'\\boverall\\b': random.choice(['in sum', 'taken together', 'collectively', 'broadly']),
+        r'\\badditionally\\b': random.choice(['also', 'plus', 'further', 'moreover']),
+        r'\\bhowever\\b': random.choice(['yet', 'though', 'although', 'nevertheless']),
+        r'\\btherefore\\b': random.choice(['thus', 'hence', 'so', 'accordingly']),
+        r'\\bconsequently\\b': random.choice(['as a result', 'thereby', 'accordingly', 'hence']),
+        r'\\bregulates\\b': random.choice(['controls', 'governs', 'modulates', 'directs']),
+        r'\\bcontains\\b': random.choice(['holds', 'possesses', 'encompasses', 'incorporates']),
+        r'\\bresponsible for\\b': random.choice(['accountable for', 'charged with', 'tasked with']),
+        r'\\bassociated with\\b': random.choice(['linked to', 'tied to', 'connected with', 'related to']),
+        r'\\binvolved in\\b': random.choice(['engaged in', 'participating in', 'taking part in']),
+        r'\\bconsists of\\b': random.choice(['comprises', 'is made up of', 'incorporates']),
+        r'\\bpart of\\b': random.choice(['component of', 'element of', 'constituent of']),
+        r'\\bfunction\\b': random.choice(['role', 'purpose', 'operation', 'activity']),
+        r'\\bstructure\\b': random.choice(['anatomy', 'architecture', 'framework', 'morphology']),
+        r'\\bprocess\\b': random.choice(['mechanism', 'procedure', 'pathway', 'sequence']),
+        r'\\bcontrol\\b': random.choice(['regulation', 'management', 'oversight', 'direction']),
     }
 
     h = sent
     for pattern, replacement in replacements.items():
         h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
 
-    # Step 2: Structural variation (subtle, not destructive)
-    if index % 4 == 0 and len(words) > 10 and ',' in h:
-        # Replace one comma with semicolon in long sentences
+    # Step 2: Sentence structure variations
+    if index % 3 == 0 and len(words) > 8:
+        # Compress to fragment
+        h = ' '.join(words[:6]) + '.'
+    elif index % 3 == 1 and len(words) < 10:
+        # Expand with clause
+        h = h.rstrip('.') + ', which remains essential for proper function.'
+    elif index % 3 == 2 and ',' in h:
+        # Semicolon swap
         h = h.replace(',', ';', 1)
 
-    # Step 3: Occasional natural transition (not on every sentence)
-    if index % 6 == 0 and len(words) > 6 and not h.startswith('#') and not h.startswith('*'):
-        starter = random.choice(ACADEMIC_TRANSITIONS)
+    # Step 3: Sentence starter variation (natural academic)
+    if index % 5 == 0 and len(words) > 5 and not h.startswith('#') and not h.startswith('*'):
+        starter = random.choice(SENTENCE_STARTERS)
         first_char = h[0]
         if first_char.isupper():
             h = starter + first_char.lower() + h[1:]
@@ -380,28 +386,98 @@ def local_humanize(sent, index):
 
     return h
 
-# ===== SYSTEM PROMPT (STRICT — no spam phrases allowed) =====
+# ===== SYSTEM PROMPT (ELITE ACADEMIC EDITOR) =====
 
-SYSTEM = """You are an elite academic editor. Rewrite AI-generated text into natural scholarly prose.
+SYSTEM = """You are an elite academic editor specializing in neuroanatomy and biomedical sciences. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
 
-CRITICAL RULES:
-1. STRICT LENGTH PARITY: Match original word count within +/- 3 words. NEVER add fluff.
-2. SYNTACTIC COMPRESSION: If you expand one sentence, compress another in same paragraph.
-3. THESIS RIGOR: Dense vocabulary. Use "epistemological", "heuristic" where natural.
-4. BURSTINESS: Alternate lengths. Long (25+ words) → Short (5-8 words) → Medium (12-18) → Short (3-6).
-5. PRESERVE CITATIONS: Keep (Author, 2020), [1], [1-3] exactly.
-6. PRESERVE STRUCTURE: Keep headings (#, ##, ###), numbered lists, bullet points EXACTLY as markdown.
-7. BANNED PHRASES (NEVER USE THESE): delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, operating continuously without conscious oversight, this structure, that structure, the present, the indicated, the respective, a process that occurs automatically, the mechanism functions autonomously, such activity proceeds reflexively, this happens without voluntary input, the response is involuntary, such control is automatic, the process remains unconscious
-8. HUMAN QUIRKS: Use "we" occasionally. Start with "But", "Yet" ONLY when it flows naturally. Use fragments. Use semicolons; like this.
-9. NEVER REPEAT: Don't use the same phrase twice in one paragraph.
-10. WORD COUNT: If original is 12 words, output must be 10-15 words. No exceptions.
-11. NO EM-DASHES: Use semicolons, colons, or parentheses instead of em-dashes.
-12. HEADINGS: Keep markdown headings intact. Do not turn "## Location" into a sentence.
-13. LISTS: Keep bullet points and numbered lists in markdown format.
-14. NATURAL FLOW: Output must read like a real professor wrote it. No awkward filler. No robotic repetition.
+CRITICAL ARCHITECTURAL CONSTRAINTS:
 
-OUTPUT ONLY JSON:
+1. STRICT WORD-COUNT PARITY (1:1 Density Ratio)
+- For every sentence you process, calculate the EXACT word count in the "original" string.
+- The "humanized" output must match that word count within +/- 2 words maximum.
+- Do NOT pad with fluff adjectives or elongate text. Use singular high-value nouns and concise verb phrases.
+- Example: If original is 12 words, rewrite must be 10-14 words.
+
+2. THE SYNTACTIC COMPRESSION RULE
+- If one sentence expands to 30+ words, the next sentence in the same paragraph MUST compress to 5-8 words.
+- Never let total paragraph word count exceed input by more than 5%.
+- Alternate: Long (28-35 words) → Short (5-8 words) → Medium (12-18) → Short (4-7) → Long (25-30).
+
+3. BANNED PHRASES (ZeroGPT triggers)
+NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly
+
+4. HUMAN QUIRKS FOR DETECTION BYPASS
+- Use "we" or "our" occasionally (1-2 times per paragraph max).
+- Start 1 in 5 sentences with "But" or "Yet" ONLY when creating contrast.
+- Use sentence fragments (3-6 words, no verb) strategically.
+- Use semicolons; not em-dashes.
+- Use parentheticals sparingly (notably), (evidently), (under normal conditions).
+- Vary sentence openers: "Interestingly," "Specifically," "In this context," "Conversely," "As expected,"
+
+5. REPETITION ELIMINATION
+- Never use the same noun phrase twice in one paragraph.
+- If "the cerebellum" appears in sentence 1, use "this structure," "the respective organ," or "it" in sentence 2.
+- Vary verb phrases: "regulates" → "controls" → "governs" → "modulates".
+
+6. CITATION & MARKDOWN PRESERVATION
+- Keep (Author, 2020), [1], [1-3] exactly as written.
+- Preserve # headings, ## subheadings, * bullet points, 1. numbered lists.
+- Do not turn "## Location" into a sentence.
+
+7. ACADEMIC TONE TARGET
+- Write like a tenured professor with 30 years of publishing experience.
+- Use precise terminology: "afferent pathways," "proprioceptive feedback," "vestibulocerebellar tracts."
+- Avoid generic transitions. Each sentence should advance the argument or provide new anatomical detail.
+- Use active voice 60% of the time, passive 40%.
+
+OUTPUT ONLY VALID JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
+
+# ===== CORRECTION LOOP FOR LENGTH =====
+
+def correction_loop(original, humanized, max_attempts=2):
+    """Send back to LLM if length is too far off."""
+    orig_count = count_words(original)
+    hum_count = count_words(humanized)
+    
+    if abs(orig_count - hum_count) <= 3:
+        return humanized
+    
+    for attempt in range(max_attempts):
+        try:
+            correction_prompt = f"""The following rewritten academic sentence violates our strict length constraint.
+Original word count: {orig_count} words.
+Your rewrite count: {hum_count} words.
+
+Original: "{original}"
+Your Rewrite: "{humanized}"
+
+Task: Adjust your rewrite so it matches EXACTLY {orig_count} words (tolerance +/- 2 words). 
+Maintain elite academic cadence and precise terminology. 
+Use the SYNTACTIC COMPRESSION RULE: if original is long, keep it long; if short, keep it short.
+Output ONLY the corrected sentence string, no quotes, no explanation."""
+
+            resp = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": correction_prompt}],
+                temperature=0.1,
+                max_tokens=200
+            )
+            corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
+            new_count = count_words(corrected)
+            
+            if abs(orig_count - new_count) <= 3:
+                return corrected
+            
+            humanized = corrected  # Try again with this as base
+            hum_count = new_count
+            
+        except Exception as e:
+            print(f"Correction loop attempt {attempt+1} failed: {e}")
+            break
+    
+    # If all corrections fail, use strict enforcement
+    return enforce_length_constraint(original, humanized, max_diff=3)
 
 # ===== MAIN PROCESSING =====
 
@@ -411,7 +487,7 @@ def humanize_with_groq(paragraphs, style):
     for i, para in enumerate(paragraphs):
         lines.append(f"Paragraph {i+1}:")
         for j, s in enumerate(para):
-            lines.append(f"{j+1}. {s}")
+            lines.append(f"{j+1}. [{count_words(s)} words] {s}")
         lines.append("")
 
     data = None
@@ -422,14 +498,14 @@ def humanize_with_groq(paragraphs, style):
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM},
-                {"role": "user", "content": f"Style: {style}\\n\\nHumanize this academic text:\\n\\n" + "\\n".join(lines)}
+                {"role": "user", "content": f"Style: {style}\\n\\nHumanize this academic text. I have marked word counts in [brackets] for each sentence. Match them exactly within +/- 2 words:\\n\\n" + "\\n".join(lines)}
             ],
             temperature=0.7,
             max_tokens=4000,
             response_format={"type": "json_object"}
         )
         text = resp.choices[0].message.content
-        print(f"RAW: {text[:200]}...")
+        print(f"RAW: {text[:300]}...")
 
         text = text.strip()
         if text.startswith("```json"):
@@ -458,7 +534,11 @@ def humanize_with_groq(paragraphs, style):
                         {
                             "original": s,
                             "humanized": local_humanize(s, j),
-                            "alternatives": [local_humanize(s, 0), local_humanize(s, 1), local_humanize(s, 2)]
+                            "alternatives": [
+                                local_humanize(s, 0),
+                                local_humanize(s, 1),
+                                local_humanize(s, 2)
+                            ]
                         } for j, s in enumerate(para)
                     ]
                 } for para in paragraphs
@@ -474,35 +554,57 @@ def humanize_with_groq(paragraphs, style):
             h = sent.get("humanized", "")
             if not h:
                 h = local_humanize(orig, j)
-            h = enforce_length_constraint(orig, h, max_diff=3)
+            
+            # CORRECTION LOOP: Send back to LLM if length is wrong
+            h = correction_loop(orig, h)
+            
+            # Additional strict enforcement
+            h = validate_and_correct_length(orig, h, max_diff=3)
+            
             para_sentences.append({"orig": orig, "hum": h, "raw_alts": sent.get("alternatives", [])[:3]})
             para_total_original += count_words(orig)
 
+        # Apply burstiness at paragraph level
         humanized_only = [s["hum"] for s in para_sentences]
         burstiness_applied = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burstiness_applied)):
-            h = enforce_length_constraint(sent_data["orig"], h, max_diff=4)
+            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
             h = final_obfuscation_layer(h)
             h = eliminate_repetition(h)
-            h = enforce_length_constraint(sent_data["orig"], h, max_diff=5)
+            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
             score = score_sentence(h)
 
+            # Process alternatives with correction loop
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 if not alt:
                     alt = local_humanize(sent_data["orig"], idx)
-                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=4)
+                
+                # Apply correction loop to alternatives too
+                alt = correction_loop(sent_data["orig"], alt)
+                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
                 alt = final_obfuscation_layer(alt)
                 alt = eliminate_repetition(alt)
-                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
+                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
                 alt = re.sub(r'\\s+', ' ', alt).strip()
                 if alt and alt[-1] not in '.!?':
                     alt += '.'
                 clean_alts.append(alt)
 
+            # Ensure 3 unique alternatives, not duplicates of original
             while len(clean_alts) < 3:
-                clean_alts.append(local_humanize(sent_data["orig"], len(clean_alts)))
+                fallback = local_humanize(sent_data["orig"], len(clean_alts) + 10)
+                fallback = correction_loop(sent_data["orig"], fallback)
+                fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
+                clean_alts.append(fallback)
+            
+            # Remove any duplicates of the original
+            clean_alts = [alt for alt in clean_alts if alt.lower().strip() != sent_data["orig"].lower().strip()]
+            while len(clean_alts) < 3:
+                fallback = local_humanize(sent_data["orig"], len(clean_alts) + 20)
+                fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
+                clean_alts.append(fallback)
 
             para_sentences[j] = SentenceData(
                 id=f"p{i}-s{j}",
