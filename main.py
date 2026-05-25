@@ -11,7 +11,8 @@ try:
 except ImportError:
     from mistralai.client import MistralClient as Mistral
 
-API_KEY = os.getenv("UflvGCAqQm3Itpgv2WadHSE82tmJns4d", "")
+import os
+API_KEY = os.getenv("MISTRAL_API_KEY", "")
 if not API_KEY:
     print("ERROR: No API key")
     exit(1)
