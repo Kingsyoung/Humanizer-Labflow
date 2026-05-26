@@ -55,13 +55,13 @@ class ProcessResponse(BaseModel):
 # ===== TEXT SPLITTING (PRESERVES MARKDOWN HEADINGS) =====
 
 def split_sentences(text):
-    """Split text into sentences, preserving citations and abbreviations."""
+    """Split text into sentences, preserving citations and abbreviations, afterwards merge the ones that are same paragraph as a paragraph."""
     text = re.sub(r"\b(e\.g\.|i\.e\.|et al\.|Fig\.|Dr\.|Prof\.)\s", lambda m: m.group(0).replace(".", "\x00"), text)
     sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", text.strip())
     return [s.replace("\x00", ".").strip() for s in sents if s.strip()]
 
 def split_paragraphs(text):
-    """Split text into paragraphs, preserving markdown structure."""
+    """Split text into paragraphs, preserving markdown structure, but make the paragraph the way the original is."""
     lines = text.split("\n")
     paragraphs = []
     current = []
@@ -127,14 +127,16 @@ def count_words(text):
 
 def get_filler_phrase():
     fillers = [
-        "a process that occurs automatically.",
-        "this happens without voluntary input.",
-        "such activity proceeds reflexively.",
-        "the mechanism functions autonomously.",
-        "this operates below conscious awareness.",
-        "the response is involuntary.",
-        "such control is automatic.",
-        "the process remains unconscious."
+        "it is reasonable to suggest that",
+        "evidence tentatively points to",
+        "this dynamic arguably stems from",
+        "crucially, this aligns with",
+        "this perspective is further complicated by",
+        "expanding on this premise,",
+        "by extension, it follows that",
+        "from an analytical standpoint,",
+        "within this specific framework,",
+        "when viewed through this lens,"
     ]
     return random.choice(fillers)
 
@@ -454,8 +456,8 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 
 5. REPETITION ELIMINATION
 - Never use the same noun phrase twice in one paragraph.
-- If "the cerebellum" appears in sentence 1, use "this structure," "the respective organ," or "it" in sentence 2.
-- Vary verb phrases: "regulates" → "controls" → "governs" → "modulates".
+- If "an organ, structure, a noun" appears in sentence 1, use "this structure," "the respective organ," or "it" in sentence 2.
+- Vary verb phrases: "regulates" → "controls" → "" → "modulates".
 
 6. CITATION & MARKDOWN PRESERVATION
 - Keep (Author, 2020), [1], [1-3] exactly as written.
@@ -466,7 +468,7 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 7. ACADEMIC TONE TARGET
 - Write like a tenured professor with 30 years of publishing experience.
 - Use precise terminology: "afferent pathways," "proprioceptive feedback," "vestibulocerebellar tracts."
-- Avoid generic transitions. Each sentence should advance the argument or provide new anatomical detail.
+- Avoid generic transitions. Each sentence should advance the argument or provide new scientific detail.
 - Use active voice 60% of the time, passive 40%.
 
 OUTPUT ONLY VALID JSON:
