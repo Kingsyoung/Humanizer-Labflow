@@ -50,7 +50,6 @@ class ProcessResponse(BaseModel):
 
 
 # ===== VOCABULARY SYSTEM =====
-# Structured vocabulary pools by semantic category
 
 STRUCTURAL_NOUNS = {
     "framework", "methodology", "nexus", "phenomenon", "correlate", "paradigm",
@@ -60,18 +59,21 @@ STRUCTURAL_NOUNS = {
     "ontology", "taxonomy", "morphology", "anatomy", "physiology", "homeostasis"
 }
 
-# Anatomical/technical nouns that can anchor parentheticals
 ANCHOR_NOUNS = {
     "cerebellum", "medulla", "pons", "cortex", "tracts", "nuclei", "nerves",
     "arteries", "pyramids", "olives", "structure", "organ", "system", "pathway",
     "mechanism", "framework", "apparatus", "substrate", "topology", "interface",
-    "nucleus", "ganglion", "plexus", "fasciculus", "lamina", "sulcus", "gyrus"
+    "nucleus", "ganglion", "plexus", "fasciculus", "lamina", "sulcus", "gyrus",
+    # extended for non-bio domains
+    "model", "theory", "argument", "concept", "process", "method", "approach",
+    "variable", "factor", "element", "component", "dimension", "aspect",
+    "institution", "policy", "context", "framework", "paradigm", "principle",
+    "evidence", "data", "analysis", "result", "finding", "outcome",
 }
 
-# O(1) lookup sets for connectors that trigger score penalties
 TRANSITIONAL_OPENERS = {
     "furthermore", "moreover", "however", "therefore", "thus", "consequently",
-    "additionally", "crucially", "additionally", "subsequently", "nevertheless",
+    "additionally", "crucially", "subsequently", "nevertheless",
     "notwithstanding", "accordingly"
 }
 
@@ -87,27 +89,53 @@ AI_TELL_PHRASES = {
     "indeed", "arguably", "significantly"
 }
 
-# ── Hedging parentheticals (inserted mid-sentence after anchor nouns) ──────
-HEDGING_PARENTHETICALS = [
+
+# ===========================================================================
+# ===== DOMAIN-AWARE FILLER SYSTEM ==========================================
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Universal hedging parentheticals — safe in ANY discipline
+# ---------------------------------------------------------------------------
+HEDGING_PARENTHETICALS: list = [
     "(arguably)",
     "(presumably)",
     "(by extension)",
     "(virtually)",
     "(notably)",
     "(evidently)",
-    "(under normal conditions)",
-    "(under homeostatic regulation)",
     "(characteristically)",
     "(as expected)",
     "(in most cases)",
-    "(physiologically speaking)",
+    "(broadly speaking)",
+    "(on balance)",
+    "(to some degree)",
+    "(in principle)",
+    "(to varying extents)",
+    "(within reason)",
+    "(contextually)",
+    "(under typical conditions)",
+    "(in relative terms)",
+    "(with few exceptions)",
+    "(under standard assumptions)",
+    "(in theoretical terms)",
+    "(empirically speaking)",
+    "(all else being equal)",
+    "(in general terms)",
+    "(as conventionally understood)",
+    "(by most accounts)",
+    "(from a functional standpoint)",
+    "(by current consensus)",
+    "(in practical terms)",
+    "(in the broader sense)",
 ]
 
-# ── Signposting sentence-openers (prepended to whole sentences) ────────────
-SIGNPOST_OPENERS = [
+# ---------------------------------------------------------------------------
+# Universal signpost openers — safe in ANY discipline
+# ---------------------------------------------------------------------------
+SIGNPOST_OPENERS: list = [
     "From an analytical standpoint,",
     "Within this framework,",
-    "Crucially, this aligns with",
     "Interestingly,",
     "Notably,",
     "In practice,",
@@ -128,33 +156,531 @@ SIGNPOST_OPENERS = [
     "Within this specific context,",
     "Taken together,",
     "Viewed through this lens,",
+    "On closer inspection,",
+    "As the evidence suggests,",
+    "In the present case,",
+    "By the same token,",
+    "At the same time,",
+    "In a related vein,",
+    "Against this backdrop,",
+    "In light of this,",
+    "To this end,",
+    "In doing so,",
+    "For this reason,",
+    "By extension,",
+    "From this perspective,",
+    "Upon reflection,",
+    "With this in mind,",
+    "In the same manner,",
+    "To a certain extent,",
+    "Alongside this,",
+    "Most importantly,",
+    "In broader terms,",
+    "Under closer scrutiny,",
+    "When considered carefully,",
+    "At its core,",
+    "From a structural standpoint,",
+    "Taken in isolation,",
+    "In the aggregate,",
+    "Across domains,",
+    "Fundamentally,",
 ]
 
+# ---------------------------------------------------------------------------
+# Domain-specific filler phrase banks
+# ---------------------------------------------------------------------------
 
-# ── Expansion parentheticals (appended to short sentences) ────────────────
-EXPANSION_PARENTHETICALS = [
-    "(a requirement that cannot be bypassed)",
-    "(this occurs involuntarily)",
+_BIO_FILLERS: list = [
+    "through integrated feedback loops",
+    "via polysynaptic relay pathways",
+    "under homeostatic regulation",
+    "through descending cortical input",
+    "via ascending somatosensory relays",
+    "contingent on afferent signal integrity",
+    "across distributed neural assemblies",
+    "within tightly regulated homeostatic bounds",
+    "through reciprocal thalamocortical projections",
+    "under conditions of normal physiological demand",
+    "via efferent motor output channels",
+    "through coordinated synaptic transmission",
+    "under autonomic nervous system oversight",
+    "across convergent sensorimotor pathways",
+    "through receptor-mediated signal transduction",
+    "via chemokine-guided cellular recruitment",
+    "under conditions of metabolic equilibrium",
+    "through paracrine intercellular signaling",
+    "within genetically encoded regulatory networks",
+    "via post-translational protein modification",
+]
+_BIO_EXPANSION: list = [
     "(under normal physiological conditions)",
     "(a process essential for survival)",
     "(mediated by descending corticospinal tracts)",
     "(regulated through negative feedback mechanisms)",
     "(consistent with established neuroanatomical models)",
     "(dependent on intact afferent-efferent circuitry)",
+    "(this occurs involuntarily)",
+    "(a requirement that cannot be bypassed)",
+    "(via receptor-ligand binding interactions)",
+    "(under hormonal regulatory influence)",
+    "(governed by enzymatic cascade reactions)",
+    "(contingent on cellular membrane integrity)",
 ]
+
+_TECH_FILLERS: list = [
+    "within tightly constrained computational parameters",
+    "contingent on data stream integrity",
+    "via iterative algorithmic refinement",
+    "under standard experimental conditions",
+    "through layered abstraction hierarchies",
+    "across distributed processing nodes",
+    "via stochastic gradient optimization",
+    "under defined boundary conditions",
+    "through recursive logical decomposition",
+    "contingent on model convergence criteria",
+    "via parallel execution pipelines",
+    "within the defined state space",
+    "through probabilistic inference mechanisms",
+    "across heterogeneous network topologies",
+    "under controlled simulation parameters",
+    "via adaptive error-correction protocols",
+    "within formally specified constraint sets",
+    "through modular system decomposition",
+    "under worst-case asymptotic bounds",
+    "via deterministic finite-state transitions",
+]
+_TECH_EXPANSION: list = [
+    "(within computational complexity bounds)",
+    "(subject to hardware resource constraints)",
+    "(under controlled benchmark conditions)",
+    "(consistent with formal specification requirements)",
+    "(assuming deterministic input conditions)",
+    "(validated against held-out test data)",
+    "(per established algorithmic conventions)",
+    "(across multiple independent test runs)",
+    "(subject to convergence guarantees)",
+    "(as established in prior literature)",
+]
+
+_HUMANITIES_FILLERS: list = [
+    "within prevailing theoretical frameworks",
+    "through established socio-cultural paradigms",
+    "contingent on historical contextual variables",
+    "across distinct analytical dimensions",
+    "through critical hermeneutic engagement",
+    "via discursive power structures",
+    "within historically situated interpretive horizons",
+    "through comparative textual analysis",
+    "across divergent ideological formations",
+    "via dialectical modes of inquiry",
+    "within contested epistemic traditions",
+    "through sustained close reading practices",
+    "across geopolitical and temporal boundaries",
+    "via intertextual referential networks",
+    "through phenomenological interpretive frameworks",
+    "within the logic of the historical archive",
+    "across competing scholarly genealogies",
+    "through narratological structural analysis",
+    "via ideological critique and deconstruction",
+    "within dominant and subaltern discourses",
+]
+_HUMANITIES_EXPANSION: list = [
+    "(as the scholarly literature attests)",
+    "(subject to interpretive contestation)",
+    "(a point widely acknowledged in the field)",
+    "(within its specific historical moment)",
+    "(consistent with the theoretical tradition)",
+    "(as subsequent historiography has confirmed)",
+    "(a claim that warrants careful qualification)",
+    "(a position not without its critics)",
+    "(in the context of the broader debate)",
+    "(as the primary sources make clear)",
+]
+
+_SOCIAL_FILLERS: list = [
+    "through established socio-institutional mechanisms",
+    "within prevailing policy frameworks",
+    "contingent on baseline contextual variables",
+    "via iterative social feedback processes",
+    "across macro- and micro-level analytical scales",
+    "through latent structural inequalities",
+    "under conditions of institutional constraint",
+    "via incentive-compatible behavioral mechanisms",
+    "within normative regulatory environments",
+    "through mediating psychosocial pathways",
+    "across heterogeneous population subgroups",
+    "via rational-choice optimization models",
+    "within structurally embedded power relations",
+    "through cognitive-behavioral regulatory processes",
+    "contingent on socioeconomic baseline conditions",
+    "across intersecting axes of identity",
+    "via self-reinforcing institutional feedback loops",
+    "within bounded rationality frameworks",
+    "through stratified sampling methodological designs",
+    "across longitudinal observational time points",
+]
+_SOCIAL_EXPANSION: list = [
+    "(as demonstrated in empirical studies)",
+    "(consistent with the existing evidence base)",
+    "(subject to individual-level variation)",
+    "(a finding replicated across multiple contexts)",
+    "(as the regression analysis confirms)",
+    "(under conditions of ecological validity)",
+    "(holding other variables constant)",
+    "(as theory would predict)",
+    "(across demographically diverse samples)",
+    "(contingent on measurement reliability)",
+]
+
+_NATURAL_FILLERS: list = [
+    "through thermodynamically driven processes",
+    "via molecular diffusion gradients",
+    "under equilibrium state conditions",
+    "through biogeochemical cycling pathways",
+    "across spatiotemporal ecological gradients",
+    "via catalytic reaction intermediates",
+    "within energetically bounded system states",
+    "through coupled atmospheric-oceanic dynamics",
+    "contingent on ambient environmental conditions",
+    "via second-law thermodynamic constraints",
+    "across trophic energy transfer levels",
+    "through quantum mechanical wave-particle interactions",
+    "under standard temperature and pressure conditions",
+    "via electrochemical potential gradients",
+    "within defined thermodynamic phase boundaries",
+    "through stochastic environmental perturbations",
+    "across macro- and micro-ecological scales",
+    "via radiative energy transfer mechanisms",
+    "within geologically constrained timescales",
+    "through oxidation-reduction reaction cycles",
+]
+_NATURAL_EXPANSION: list = [
+    "(under controlled laboratory conditions)",
+    "(consistent with thermodynamic principles)",
+    "(as field observations confirm)",
+    "(subject to ambient temperature effects)",
+    "(across experimentally replicated trials)",
+    "(within measurable detection thresholds)",
+    "(as spectrometric analysis verifies)",
+    "(under isothermal equilibrium conditions)",
+    "(consistent with conservation of mass)",
+    "(as validated by independent replication)",
+]
+
+_EDUCATION_FILLERS: list = [
+    "through scaffolded instructional sequences",
+    "via formative assessment feedback loops",
+    "under constructivist pedagogical frameworks",
+    "across differentiated learning modalities",
+    "through metacognitive self-regulatory strategies",
+    "via zone-of-proximal-development scaffolding",
+    "within socially situated learning environments",
+    "through inquiry-based instructional design",
+    "across culturally responsive curriculum frameworks",
+    "via deliberate practice and spaced repetition",
+]
+_EDUCATION_EXPANSION: list = [
+    "(as evidence-based pedagogy prescribes)",
+    "(consistent with constructivist learning theory)",
+    "(across diverse learner populations)",
+    "(subject to instructional design constraints)",
+    "(as classroom observation data confirms)",
+]
+
+_LAW_FILLERS: list = [
+    "within applicable statutory and regulatory frameworks",
+    "contingent on jurisdictional precedent",
+    "through established common law doctrine",
+    "via judicial interpretive mechanisms",
+    "under constitutional due process constraints",
+    "through adversarial procedural safeguards",
+    "across distinct jurisprudential traditions",
+    "via proportionality and balancing tests",
+    "within legislatively defined normative boundaries",
+    "through equitable remedial discretion",
+]
+_LAW_EXPANSION: list = [
+    "(as established by binding precedent)",
+    "(subject to legislative amendment)",
+    "(within the bounds of constitutional authority)",
+    "(per the court's interpretive holding)",
+    "(consistent with the rule of law)",
+]
+
+_BUSINESS_FILLERS: list = [
+    "through market-driven competitive mechanisms",
+    "via resource allocation optimization processes",
+    "contingent on supply-chain operational integrity",
+    "across vertically and horizontally integrated structures",
+    "through risk-adjusted return optimization",
+    "via dynamic capability reconfiguration",
+    "within evolving competitive market landscapes",
+    "through stakeholder value alignment strategies",
+    "under conditions of information asymmetry",
+    "via transaction cost minimization mechanisms",
+    "across diversified portfolio risk structures",
+    "through behavioral economic decision frameworks",
+    "contingent on macroeconomic baseline conditions",
+    "via financial instrument pricing models",
+    "within regulatory compliance frameworks",
+]
+_BUSINESS_EXPANSION: list = [
+    "(as market data consistently shows)",
+    "(subject to regulatory oversight)",
+    "(under ceteris paribus conditions)",
+    "(consistent with efficient market theory)",
+    "(across multiple fiscal reporting periods)",
+    "(as financial modeling confirms)",
+    "(contingent on investor risk tolerance)",
+    "(within accepted accounting standards)",
+]
+
+# Universal fallback — field-neutral, safe for any sentence
+_UNIVERSAL_FILLERS: list = [
+    "through inherently integrated processes",
+    "within clearly defined boundaries",
+    "under normal operational conditions",
+    "via closely coordinated internal mechanisms",
+    "contingent on underlying structural integrity",
+    "across multiple interconnected dimensions",
+    "through systematically organized pathways",
+    "within established theoretical parameters",
+    "under standard analytical conditions",
+    "via well-documented empirical patterns",
+    "across rigorously controlled conditions",
+    "through convergent lines of evidence",
+    "within broadly accepted scholarly norms",
+    "via recursive self-reinforcing dynamics",
+    "under conditions of internal consistency",
+    "through mutually reinforcing causal chains",
+    "across diverse empirical contexts",
+    "within methodologically defined constraints",
+    "through complementary analytical approaches",
+    "via interrelated systemic components",
+    "under conditions of theoretical parsimony",
+    "across multiple levels of analysis",
+    "through the interplay of structural factors",
+    "within the scope of the current analysis",
+    "via established disciplinary conventions",
+    "under well-specified model assumptions",
+    "through iterative cycles of refinement",
+    "contingent on prior theoretical commitments",
+    "across a range of empirical observations",
+    "within systematically structured frameworks",
+    "through hierarchically organized mechanisms",
+    "via complementary theoretical perspectives",
+    "under conditions of analytical rigor",
+    "across temporally and spatially distinct cases",
+    "through overlapping and reinforcing processes",
+    "within the framework of existing scholarship",
+    "via consistent methodological application",
+    "under carefully controlled parameters",
+    "across independent yet converging domains",
+    "through sustained empirical investigation",
+    "within logically structured argument chains",
+    "via the application of formal analytical tools",
+    "under conditions widely recognized in the field",
+    "across both theoretical and applied dimensions",
+    "through a principled sequence of analytical steps",
+]
+_UNIVERSAL_EXPANSION: list = [
+    "(as the evidence consistently indicates)",
+    "(a point well-established in the literature)",
+    "(subject to methodological qualification)",
+    "(under conditions of rigorous scrutiny)",
+    "(as subsequent analysis confirms)",
+    "(a finding robust across contexts)",
+    "(in ways that merit further investigation)",
+    "(consistent with prior theoretical accounts)",
+    "(under the assumptions stated above)",
+    "(an observation not without precedent)",
+    "(as the broader literature attests)",
+    "(subject to the caveats noted above)",
+    "(across independently validated studies)",
+    "(a claim well-supported by available evidence)",
+    "(this remains a productive area of inquiry)",
+    "(as logically follows from the premises)",
+    "(in keeping with standard academic practice)",
+    "(absent confounding variables)",
+    "(across methodologically diverse approaches)",
+    "(upon careful analytical examination)",
+]
+
+# ---------------------------------------------------------------------------
+# Domain keyword detector
+# ---------------------------------------------------------------------------
+_DOMAIN_KEYWORDS: dict = {
+    "bio": [
+        "cell", "cells", "neural", "neuron", "neurons", "brain", "cortex", "body",
+        "system", "physiological", "anatomy", "anatomical", "organ", "tissue",
+        "gene", "genetic", "protein", "enzyme", "receptor", "synapse", "axon",
+        "dendrite", "hormone", "metabolism", "homeostasis", "pathology", "clinical",
+        "medical", "patient", "disease", "diagnosis", "treatment", "surgery",
+        "immune", "blood", "cardiac", "cerebellum", "medulla", "pons", "cortical",
+        "nucleus", "nuclei", "tract", "tracts", "nerve", "nerves", "spinal",
+        "vascular", "artery", "arteries", "vein", "veins", "muscle", "skeletal",
+        "cellular", "molecular", "biochemical", "pharmacological", "therapeutic",
+    ],
+    "tech": [
+        "data", "dataset", "model", "models", "algorithm", "algorithms", "results",
+        "analysis", "variable", "variables", "test", "compute", "computation",
+        "software", "code", "program", "function", "parameter", "neural network",
+        "machine learning", "deep learning", "artificial intelligence", "database",
+        "query", "server", "api", "protocol", "encryption", "bandwidth",
+        "latency", "throughput", "optimization", "runtime", "compiler",
+        "hardware", "processor", "memory", "storage", "simulation", "sensor",
+        "signal", "frequency", "circuit", "voltage", "current", "resistance",
+        "matrix", "vector", "tensor", "gradient", "loss function", "accuracy",
+        "precision", "recall", "classification", "regression", "clustering",
+        "pipeline", "deployment", "scalability", "architecture", "engineering",
+    ],
+    "humanities": [
+        "poem", "poetry", "novel", "narrative", "text", "texts", "author",
+        "literature", "literary", "history", "historical", "culture", "cultural",
+        "philosophy", "philosophical", "theory", "theoretical", "argument",
+        "discourse", "ideology", "ideological", "hermeneutics", "phenomenology",
+        "ontology", "epistemology", "ethics", "aesthetic", "aesthetics",
+        "canon", "genre", "rhetoric", "metaphor", "symbol", "symbolism",
+        "interpretation", "archive", "manuscript", "source", "period",
+        "movement", "tradition", "mythology", "religion", "theology",
+        "identity", "representation", "colonialism", "postcolonial", "modernity",
+        "postmodern", "structuralism", "deconstruction", "semiotics",
+    ],
+    "social": [
+        "society", "social", "policy", "policies", "government", "political",
+        "economics", "economic", "market", "markets", "behavior", "behaviour",
+        "psychology", "psychological", "sociology", "sociological", "population",
+        "survey", "questionnaire", "interview", "participant", "participants",
+        "sample", "demographic", "inequality", "poverty", "wealth", "income",
+        "race", "gender", "class", "ethnicity", "community", "communities",
+        "institution", "institutions", "organization", "organizations",
+        "attitude", "attitudes", "perception", "perceptions", "norm", "norms",
+        "vote", "voter", "election", "democracy", "governance", "legislation",
+        "welfare", "healthcare", "education", "employment", "labor", "labour",
+        "regression", "coefficient", "correlation", "effect size", "p-value",
+    ],
+    "natural": [
+        "climate", "environment", "environmental", "ecology", "ecological",
+        "species", "biodiversity", "habitat", "ecosystem", "evolution",
+        "chemistry", "chemical", "reaction", "compound", "molecule", "molecules",
+        "atom", "atoms", "element", "elements", "periodic", "quantum", "physics",
+        "energy", "thermodynamics", "entropy", "kinetics", "dynamics",
+        "geology", "geologic", "sediment", "tectonic", "oceanic", "atmospheric",
+        "carbon", "nitrogen", "oxygen", "hydrogen", "temperature", "pressure",
+        "wavelength", "radiation", "electromagnetic", "gravitational", "force",
+        "mass", "velocity", "acceleration", "momentum", "photon", "electron",
+        "proton", "neutron", "isotope", "radioactive", "catalyst",
+        "concentration", "solution", "solvent", "polymer", "organic",
+    ],
+    "education": [
+        "student", "students", "teacher", "teachers", "classroom", "curriculum",
+        "learning", "learner", "learners", "pedagogy", "pedagogical",
+        "instruction", "instructional", "assessment", "literacy", "numeracy",
+        "school", "university", "college", "course", "module", "lesson",
+        "scaffolding", "feedback", "motivation", "engagement", "retention",
+        "cognition", "cognitive", "metacognition", "self-regulation",
+        "constructivism", "zone of proximal development", "differentiation",
+    ],
+    "law": [
+        "law", "legal", "court", "courts", "judge", "judges", "judicial",
+        "statute", "statutes", "legislation", "regulation", "regulations",
+        "contract", "contracts", "liability", "tort", "plaintiff", "defendant",
+        "jurisdiction", "precedent", "constitutional", "rights", "criminal",
+        "civil", "procedure", "evidence", "testimony", "ruling", "verdict",
+        "appeal", "appellate", "compliance", "enforcement", "jurisprudence",
+        "doctrine", "equity", "remedy",
+    ],
+    "business": [
+        "business", "firm", "firms", "company", "companies", "profit",
+        "revenue", "cost", "costs", "investment", "investor", "finance",
+        "financial", "accounting", "audit", "budget", "fiscal", "strategy",
+        "strategic", "management", "manager", "leadership", "supply chain",
+        "logistics", "operations", "performance", "kpi", "shareholder",
+        "equity", "asset", "liability", "competition", "competitive",
+        "industry", "sector", "gdp", "inflation", "monetary", "trade",
+        "export", "import",
+    ],
+}
+
+_FILLER_MAP: dict = {
+    "bio":        _BIO_FILLERS,
+    "tech":       _TECH_FILLERS,
+    "humanities": _HUMANITIES_FILLERS,
+    "social":     _SOCIAL_FILLERS,
+    "natural":    _NATURAL_FILLERS,
+    "education":  _EDUCATION_FILLERS,
+    "law":        _LAW_FILLERS,
+    "business":   _BUSINESS_FILLERS,
+    "universal":  _UNIVERSAL_FILLERS,
+}
+
+_EXPANSION_MAP: dict = {
+    "bio":        _BIO_EXPANSION,
+    "tech":       _TECH_EXPANSION,
+    "humanities": _HUMANITIES_EXPANSION,
+    "social":     _SOCIAL_EXPANSION,
+    "natural":    _NATURAL_EXPANSION,
+    "education":  _EDUCATION_EXPANSION,
+    "law":        _LAW_EXPANSION,
+    "business":   _BUSINESS_EXPANSION,
+    "universal":  _UNIVERSAL_EXPANSION,
+}
+
+
+def _detect_domain(sentence: str) -> str:
+    """
+    Score the sentence against each domain's keyword list.
+    Returns the best-matching domain key, or 'universal' if no domain
+    scores at least 2 keyword hits.
+    """
+    text = sentence.lower()
+    scores: dict = {domain: 0 for domain in _DOMAIN_KEYWORDS}
+    for domain, keywords in _DOMAIN_KEYWORDS.items():
+        for kw in keywords:
+            if kw in text:
+                scores[domain] += 1
+    best = max(scores, key=lambda d: scores[d])
+    return best if scores[best] >= 2 else "universal"
+
+
+def get_filler_phrase(sentence: str = "") -> str:
+    """
+    Return a domain-appropriate filler expansion phrase.
+    Pass the current sentence text for context detection.
+    30 % of the time blends in a universal phrase to avoid monotony.
+    """
+    domain = _detect_domain(sentence) if sentence else "universal"
+    pool = _FILLER_MAP.get(domain, _UNIVERSAL_FILLERS)
+    if random.random() < 0.3:
+        pool = _UNIVERSAL_FILLERS
+    return random.choice(pool)
+
+
+def get_expansion_parenthetical(sentence: str = "") -> str:
+    """
+    Return a domain-appropriate expansion parenthetical.
+    Pass the current sentence text for context detection.
+    """
+    domain = _detect_domain(sentence) if sentence else "universal"
+    pool = _EXPANSION_MAP.get(domain, _UNIVERSAL_EXPANSION)
+    if random.random() < 0.3:
+        pool = _UNIVERSAL_EXPANSION
+    return random.choice(pool)
 
 
 def get_hedging_parenthetical() -> str:
+    """Return a hedging parenthetical — universally safe across all fields."""
     return random.choice(HEDGING_PARENTHETICALS)
 
+
 def get_signpost_opener() -> str:
+    """Return a signposting sentence opener — universally safe across all fields."""
     return random.choice(SIGNPOST_OPENERS)
 
-def get_filler_phrase() -> str:
-    return random.choice(FILLER_PHRASES)
 
-def get_expansion_parenthetical() -> str:
-    return random.choice(EXPANSION_PARENTHETICALS)
+# ===========================================================================
+# ===== END FILLER SYSTEM ===================================================
+# ===========================================================================
 
 
 # ===== TEXT SPLITTING =====
@@ -164,13 +690,11 @@ _ABBREV_RE = re.compile(
 )
 
 def split_sentences(text: str) -> List[str]:
-    """Split text into sentences, preserving abbreviations and citations."""
     protected = _ABBREV_RE.sub(lambda m: m.group(0).replace(".", "\x00"), text)
     sents = re.split(r"(?<=[.!?])\s+(?=[A-Z])", protected.strip())
     return [s.replace("\x00", ".").strip() for s in sents if s.strip()]
 
 def split_paragraphs(text: str) -> List[List[str]]:
-    """Split text into paragraphs, then sentences within each."""
     paragraphs, current = [], []
     for line in text.split("\n"):
         stripped = line.strip()
@@ -182,7 +706,6 @@ def split_paragraphs(text: str) -> List[List[str]]:
             current.append(stripped)
     if current:
         paragraphs.append(current)
-
     return [split_sentences(" ".join(para)) for para in paragraphs]
 
 def is_markdown_heading(text: str) -> bool:
@@ -200,34 +723,28 @@ def score_sentence(sent: str) -> float:
     words = sent.split()
     score = 0
 
-    # O(1) phrase lookups
     for tell in AI_TELL_PHRASES:
         if tell in s:
             score += 15
 
-    # Length in the "AI sweet spot"
     if 15 <= len(words) <= 22:
         score += 10
 
-    # Transitional opener penalty — O(1) set lookup
     if words:
         first = words[0].lower().strip(",.!?;:")
         if first in TRANSITIONAL_OPENERS:
             score += 12
 
-    # Low lexical diversity
     if len(words) > 5:
         unique_ratio = len({w.lower() for w in words}) / len(words)
         if unique_ratio < 0.5:
             score += 10
 
-    # Punctuation overload
     if sent.count(",") > 3 or sent.count(";") > 2:
         score += 15
     if "operating continuously" in s:
         score += 25
 
-    # Broken fragment penalty
     if len(words) < 4 and not (sent.startswith("#") or sent.startswith("*")):
         score += 20
 
@@ -241,7 +758,6 @@ def count_words(text: str) -> int:
 # ===== LENGTH ENFORCEMENT =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 3) -> str:
-    """Trim or expand humanized text to match original word count within ±max_diff."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
 
@@ -254,8 +770,8 @@ def enforce_length_constraint(original: str, humanized: str, max_diff: int = 3) 
         trimmed = " ".join(words[:keep]).rstrip(",;—")
         return trimmed if trimmed[-1] in ".!?" else trimmed + "."
 
-    # Too short: append filler phrase
-    humanized = humanized.rstrip(".") + " " + get_filler_phrase() + "."
+    # Too short: append a context-aware filler phrase
+    humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized) + "."
     return humanized
 
 def validate_and_correct_length(original: str, humanized: str, max_diff: int = 3) -> str:
@@ -267,61 +783,37 @@ def validate_and_correct_length(original: str, humanized: str, max_diff: int = 3
 # ===== GRAMMAR-SAFE PARENTHETICAL INSERTION =====
 
 def _insert_parenthetical_after_noun(sent: str, noun: str, parenthetical: str) -> str:
-    """
-    Insert a parenthetical immediately after `noun` in `sent`,
-    correctly handling trailing punctuation.
-
-    e.g. "The cortex, ..."  →  "The cortex (notably), ..."
-         "The cortex."      →  "The cortex (notably)."
-    """
-    # Pattern: noun optionally followed by punctuation
     pattern = re.compile(
         r"(\b" + re.escape(noun) + r"\b)([,\.;:!?]?)",
         re.IGNORECASE
     )
-
     def replacer(m):
         word, punct = m.group(1), m.group(2)
         if punct:
             return f"{word} {parenthetical}{punct}"
         return f"{word} {parenthetical}"
-
     return pattern.sub(replacer, sent, count=1)
 
 
 def _prepend_signpost(sent: str, opener: str) -> str:
-    """
-    Prepend a signposting opener to a sentence.
-    Handles capitalization: opener ends with comma → force next word lowercase.
-    Opener ends without comma → keep case.
-    """
     sent = sent.strip()
     if not sent:
         return sent
-
-    # Opener already capitalised (it should be from our list)
     opener = opener.strip()
-
-    # Force first word of original sentence to lowercase after a comma
     if opener.endswith(","):
         first_char = sent[0]
         rest = sent[1:]
         sent_body = first_char.lower() + rest
     else:
-        # Opener ends with full word — add space, keep original case
         sent_body = sent
-
     return f"{opener} {sent_body}"
 
 
-# ===== OBFUSCATION LAYER (GRAMMAR-AWARE) =====
+# ===== OBFUSCATION LAYER =====
 
-# Configurable modification rate (0.0–1.0). Only this fraction of sentences
-# will receive structural modifications, preserving natural cadence.
 MODIFICATION_RATE = 0.38
 
 def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_RATE) -> str:
-    """Apply subtle linguistic variations to a fraction of sentences."""
     sentences = split_sentences(text)
     processed = []
 
@@ -331,7 +823,6 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
             processed.append(sent)
             continue
 
-        # Pacing gate: only modify ~modification_rate of sentences
         if random.random() > modification_rate:
             processed.append(sent)
             continue
@@ -339,7 +830,6 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
         technique = i % 4
 
         if technique == 0 and len(words) > 10:
-            # SEMICOLON substitution — only between two independent clauses
             if "," in sent and len(words) > 12:
                 parts = sent.split(",", 1)
                 left_words = parts[0].split()
@@ -348,15 +838,15 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
                     sent = parts[0] + "; " + parts[1].strip()
 
         elif technique == 1 and len(words) > 8:
-            # PARENTHETICAL after an anchor noun (grammar-safe)
             for idx, word in enumerate(words):
                 clean = word.lower().strip(",.!?;:")
                 if clean in ANCHOR_NOUNS:
-                    sent = _insert_parenthetical_after_noun(sent, clean, get_hedging_parenthetical())
+                    sent = _insert_parenthetical_after_noun(
+                        sent, clean, get_hedging_parenthetical()
+                    )
                     break
 
         elif technique == 2 and len(words) > 12:
-            # CLAUSE SPLIT at subordinating conjunctions
             break_words = {"which", "where", "when", "while", "although"}
             for idx, word in enumerate(words):
                 if word.lower() in break_words and 3 < idx < len(words) - 4:
@@ -367,7 +857,6 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
                     break
 
         elif technique == 3 and len(words) > 10:
-            # COMPOUND SPLIT: replace "and" between two clauses with adverbial phrase
             if " and " in sent:
                 and_pos = sent.find(" and ")
                 before, after = sent[:and_pos].strip(), sent[and_pos + 5:].strip()
@@ -387,10 +876,9 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
 
 # ===== SIGNPOST LAYER =====
 
-SIGNPOST_RATE = 0.20  # ~1 in 5 sentences receives a signpost opener
+SIGNPOST_RATE = 0.20
 
 def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
-    """Prepend signposting openers to a subset of sentences."""
     sentences = split_sentences(text)
     processed = []
     for i, sent in enumerate(sentences):
@@ -410,7 +898,6 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text: str) -> str:
-    """Reduce conceptual repetition via bigram overlap tracking."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -441,7 +928,6 @@ def eliminate_repetition(text: str) -> str:
 # ===== BURSTINESS ENGINE =====
 
 def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
-    """Impose sentence-length variation for natural prose rhythm. No em-dashes."""
     if not sentences:
         return sentences
 
@@ -454,8 +940,8 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
         pattern = i % 5
 
         if pattern == 0 and len(words) < int(current_len * 1.3):
-            # LONG: embed subordinate clause
-            expansion = " through " + get_filler_phrase() + "."
+            # LONG: embed a context-aware subordinate clause
+            expansion = " through " + get_filler_phrase(sent) + "."
             sent = sent.rstrip(".") + expansion
 
         elif pattern == 1:
@@ -474,8 +960,8 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
             sent = " ".join(words[:4]) + "."
 
         elif pattern == 4 and len(words) < 18:
-            # LONG with parenthetical
-            sent = sent.rstrip(".") + " " + get_expansion_parenthetical() + "."
+            # LONG with context-aware parenthetical
+            sent = sent.rstrip(".") + " " + get_expansion_parenthetical(sent) + "."
 
         sent = re.sub(r"\s+", " ", sent).strip()
         if sent and sent[-1] not in ".!?":
@@ -496,7 +982,6 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
 
 # ===== LOCAL FALLBACK =====
 
-# Word replacement map — patterns compiled once at module load
 _WORD_REPLACEMENTS = {
     r"\bimportant\b": ["key", "critical", "main", "essential", "central", "primary"],
     r"\bplays a critical role\b": ["is essential", "is vital", "serves as", "underpins"],
@@ -531,7 +1016,6 @@ _COMPILED_REPLACEMENTS = {
 }
 
 def local_humanize(sent: str, index: int) -> str:
-    """Fallback humanizer using vocabulary substitution and structural variation."""
     words = sent.split()
     if not words:
         return sent
@@ -540,7 +1024,6 @@ def local_humanize(sent: str, index: int) -> str:
     for pattern, choices in _COMPILED_REPLACEMENTS.items():
         h = pattern.sub(lambda m, c=choices: random.choice(c), h)
 
-    # Structural variation based on sentence index
     if index % 3 == 0 and len(words) > 8:
         h = " ".join(words[:6]) + "."
     elif index % 3 == 1 and len(words) < 10:
@@ -548,7 +1031,6 @@ def local_humanize(sent: str, index: int) -> str:
     elif index % 3 == 2 and "," in h:
         h = h.replace(",", ";", 1)
 
-    # Signpost opener (rate-controlled)
     if (index % 7 == 0 and len(words) > 5
             and not is_markdown_heading(h) and not is_markdown_list(h)):
         opener = get_signpost_opener()
@@ -559,7 +1041,7 @@ def local_humanize(sent: str, index: int) -> str:
 
 # ===== SYSTEM PROMPT =====
 
-SYSTEM = """You are an elite academic editor specializing in neuroanatomy and biomedical sciences. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
+SYSTEM = """You are an elite academic editor fluent across all scholarly disciplines — including STEM, social sciences, humanities, law, business, and education. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
 
 CRITICAL ARCHITECTURAL CONSTRAINTS:
 
@@ -576,7 +1058,18 @@ CRITICAL ARCHITECTURAL CONSTRAINTS:
 3. BANNED PHRASES (ZeroGPT triggers)
 NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly
 
-4. HUMAN QUIRKS FOR DETECTION BYPASS
+4. DOMAIN DETECTION — MANDATORY FIRST STEP
+- Before rewriting, identify the field of the input text: biology, medicine, computer science, engineering, history, literature, philosophy, sociology, economics, law, education, or other.
+- Use ONLY terminology and phrasing native to that field.
+- NEVER introduce vocabulary from an unrelated discipline into the rewrite.
+- If the input is a history essay, write like a historian. If it is a CS paper, write like a computer scientist. If it is a legal brief, write like a lawyer.
+
+5. PRECISE TERMINOLOGY
+- Use terminology appropriate to the detected discipline of the input text.
+- Mirror the technical register and vocabulary density of the original.
+- Do not simplify specialized terms; replace them only with equally precise synonyms from the same field.
+
+6. HUMAN QUIRKS FOR DETECTION BYPASS
 - Use "we" or "our" occasionally (1-2 times per paragraph max).
 - Start 1 in 5 sentences with "But" or "Yet" ONLY when creating contrast.
 - Use sentence fragments (3-6 words, no verb) strategically.
@@ -584,28 +1077,34 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 - Use parentheticals sparingly: (notably), (evidently), (under normal conditions), (by extension), (presumably).
 - Vary sentence openers: "Interestingly," "Specifically," "In this context," "Conversely," "As expected," "From an analytical standpoint,"
 
-5. REPETITION ELIMINATION
-- Never use the same noun phrase twice in one paragraph.
-- Vary verb phrases: "regulates" → "controls" → "governs" → "modulates".
+7. VERB PHRASE VARIATION
+- Never repeat the same verb phrase twice in one paragraph.
+- Vary according to the detected domain:
+  Science/Bio:   "regulates" → "controls" → "governs" → "modulates" → "mediates" → "coordinates"
+  Social/Policy: "influences" → "shapes" → "determines" → "drives" → "underpins" → "constrains"
+  Humanities:    "argues" → "contends" → "posits" → "maintains" → "asserts" → "suggests"
+  Tech/Data:     "processes" → "computes" → "executes" → "evaluates" → "optimizes" → "transforms"
+  Business/Econ: "generates" → "yields" → "produces" → "drives" → "sustains" → "captures"
+  General:       "demonstrates" → "indicates" → "reveals" → "reflects" → "highlights" → "confirms"
 
-6. CITATION & MARKDOWN PRESERVATION
+8. REPETITION ELIMINATION
+- Never use the same noun phrase twice in one paragraph.
+
+9. CITATION & MARKDOWN PRESERVATION
 - Keep (Author, 2020), [1], [1-3] exactly as written.
 - Preserve # headings, ## subheadings, * bullet points, 1. numbered lists EXACTLY.
 - Do not turn "## Location" into a sentence. Headings must remain as: ## Heading Text
 
-7. ACADEMIC TONE TARGET
-- Write like a tenured professor with 30 years of publishing experience.
-- Use precise terminology: "afferent pathways," "proprioceptive feedback," "vestibulocerebellar tracts."
+10. ACADEMIC TONE TARGET
+- Write like a tenured professor with 30 years of publishing experience in the detected field.
 - Use active voice 60% of the time, passive 40%.
 
 OUTPUT ONLY VALID JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
 
-
 # ===== CORRECTION LOOP =====
 
 def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str:
-    """Re-query Mistral when length drift exceeds tolerance."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
 
@@ -679,7 +1178,6 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
         )
         text = resp.choices[0].message.content.strip()
 
-        # Strip markdown code fences if present
         if text.startswith("```json"):
             text = text[7:]
         if text.endswith("```"):
@@ -734,20 +1232,18 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 "raw_alts": sent.get("alternatives", [])[:3],
             })
 
-        # Burstiness at paragraph level
+        # Burstiness at paragraph level — pass sentence text for domain detection
         humanized_only = [s["hum"] for s in para_sentences]
         burst_sentences = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burst_sentences)):
             h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
-            # Apply signpost openers before obfuscation so capitalization is handled cleanly
             h = apply_signpost_openers(h)
             h = final_obfuscation_layer(h)
             h = eliminate_repetition(h)
             h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
             score = score_sentence(h)
 
-            # Build unique alternatives
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 alt = alt or local_humanize(sent_data["orig"], idx + 100)
