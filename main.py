@@ -130,19 +130,6 @@ SIGNPOST_OPENERS = [
     "Viewed through this lens,",
 ]
 
-# ── Filler expansion phrases (for sentences that are too short) ────────────
-FILLER_PHRASES = [
-    "through integrated feedback loops",
-    "via polysynaptic pathways",
-    "under homeostatic regulation",
-    "through descending cortical input",
-    "via ascending somatosensory relays",
-    "contingent on afferent signal integrity",
-    "across distributed neural assemblies",
-    "within tightly regulated homeostatic bounds",
-    "through reciprocal thalamocortical projections",
-    "under conditions of normal physiological demand",
-]
 
 # ── Expansion parentheticals (appended to short sentences) ────────────────
 EXPANSION_PARENTHETICALS = [
