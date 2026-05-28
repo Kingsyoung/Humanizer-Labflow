@@ -48,7 +48,7 @@ class ProcessResponse(BaseModel):
     avg_score: float
 
 
-# ===== AI TELLS & META-LANGUAGE =====
+# ===== AI TELLS & BANNED PHRASES =====
 
 AI_TELL_PHRASES = {
     "delve", "testament", "pivotal", "underscore", "shed light on", "navigate",
@@ -74,7 +74,6 @@ AI_TELL_PHRASES = {
     "that structure", "the present", "the indicated", "the respective",
 }
 
-# Procedural meta-phrases that artificially inflate text — penalized heavily
 META_PHRASES = {
     "in accordance with standard conditions",
     "within the defined scope",
@@ -90,7 +89,6 @@ META_PHRASES = {
     "under normal operating conditions",
     "as previously reported",
     "subject to these conditions",
-    "within the defined scope",
     "under the stated conditions",
     "within the applicable framework",
     "as conventionally understood",
@@ -149,58 +147,47 @@ def is_markdown_list(text: str) -> bool:
 
 
 # ===== SCORING =====
-# Lower = more human. Penalizes AI tells, meta-language, and over-formality.
 
 def score_sentence(sent: str) -> float:
     s = sent.lower()
     words = sent.split()
     score = 0
 
-    # AI tells
     for tell in AI_TELL_PHRASES:
         if tell in s:
             score += 20
 
-    # Meta procedural phrases (major penalty)
     for meta in META_PHRASES:
         if meta in s:
             score += 18
 
-    # Uniform AI length sweet spot
     if 15 <= len(words) <= 22:
         score += 5
 
-    # Transitional opener overuse
     if words:
         first = words[0].lower().strip(",.!?;:")
         if first in TRANSITIONAL_OPENERS:
             score += 10
 
-    # Low lexical diversity
     if len(words) > 5:
         unique_ratio = len({w.lower() for w in words}) / len(words)
         if unique_ratio < 0.5:
             score += 8
 
-    # Over-punctuation
     if sent.count(",") > 3 or sent.count(";") > 2:
         score += 8
 
-    # Over-hedging markers
     hedge_markers = ["appears to", "seems to", "tends to", "may be", "might be", "could be", "would be"]
     hedge_count = sum(1 for h in hedge_markers if h in s)
     if hedge_count > 2:
         score += 10
 
-    # Reward natural length variation
     if len(words) < 10 or len(words) > 28:
         score = max(0, score - 5)
 
-    # Reward direct "we" usage
     if " we " in s or s.startswith("we ") or " our " in s:
         score = max(0, score - 8)
 
-    # Reward questions (rhetorical, natural)
     if sent.endswith("?"):
         score = max(0, score - 10)
 
@@ -256,7 +243,6 @@ def _safe_end(text: str) -> str:
 # ===== LENGTH ENFORCEMENT (minimal) =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) -> str:
-    """Minimal length enforcement. Never append artificial fillers."""
     orig_count = count_words(original)
     hum_count = count_words(humanized)
 
@@ -272,11 +258,10 @@ def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) 
             return trimmed
         return humanized
 
-    # If too short, do NOT add filler. Natural writing has short sentences.
     return humanized
 
 
-# ===== REPETITION ELIMINATION (gentle) =====
+# ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text: str) -> str:
     sentences = split_sentences(text)
@@ -312,16 +297,184 @@ def eliminate_repetition(text: str) -> str:
     return " ".join(processed)
 
 
-# ===== JOURNAL REGISTER (minimal, only for informal words) =====
+# ===== NATURAL HUMAN VARIATION ENGINE =====
+# This is the core anti-detection layer. It introduces genuine human statistical
+# patterns: contractions, slight informality, varied sentence rhythm, and
+# unpredictable phrasing that breaks AI token predictability.
+
+_CONTRACTIONS = {
+    "do not": "don't",
+    "does not": "doesn't",
+    "did not": "didn't",
+    "is not": "isn't",
+    "are not": "aren't",
+    "was not": "wasn't",
+    "were not": "weren't",
+    "has not": "hasn't",
+    "have not": "haven't",
+    "had not": "hadn't",
+    "will not": "won't",
+    "would not": "wouldn't",
+    "could not": "couldn't",
+    "should not": "shouldn't",
+    "cannot": "can't",
+    "it is": "it's",
+    "that is": "that's",
+    "there is": "there's",
+    "what is": "what's",
+    "who is": "who's",
+    "where is": "where's",
+    "when is": "when's",
+    "why is": "why's",
+    "how is": "how's",
+    "i am": "i'm",
+    "you are": "you're",
+    "we are": "we're",
+    "they are": "they're",
+    "he is": "he's",
+    "she is": "she's",
+    "it has": "it's",
+    "that has": "that's",
+    "there has": "there's",
+    "i have": "i've",
+    "you have": "you've",
+    "we have": "we've",
+    "they have": "they've",
+    "i will": "i'll",
+    "you will": "you'll",
+    "we will": "we'll",
+    "they will": "they'll",
+    "he will": "he'll",
+    "she will": "she'll",
+    "it will": "it'll",
+    "would have": "would've",
+    "could have": "could've",
+    "should have": "should've",
+    "might have": "might've",
+}
+
+def apply_contractions(text: str, rate: float = 0.15) -> str:
+    """Introduce natural contractions at ~15% rate to break formal AI patterns."""
+    sentences = split_sentences(text)
+    processed = []
+    for sent in sentences:
+        if random.random() < rate and not is_markdown_heading(sent) and not is_markdown_list(sent):
+            # Apply 1-2 random contractions
+            applied = 0
+            items = list(_CONTRACTIONS.items())
+            random.shuffle(items)
+            for full, contracted in items:
+                if full in sent.lower() and applied < 2:
+                    # Case-insensitive replacement, preserve original case pattern
+                    pattern = re.compile(re.escape(full), re.IGNORECASE)
+                    sent = pattern.sub(contracted, sent, count=1)
+                    applied += 1
+        processed.append(sent)
+    return " ".join(processed)
+
+
+def apply_informal_markers(text: str, rate: float = 0.08) -> str:
+    """Add occasional natural human markers that AI avoids."""
+    sentences = split_sentences(text)
+    processed = []
+    
+    informal_starters = [
+        "honestly,",
+        "look,",
+        "the thing is,",
+        "to be fair,",
+        "admittedly,",
+        "frankly,",
+        "sure,",
+        "now,",
+        "so,",
+        "well,",
+    ]
+    
+    for i, sent in enumerate(sentences):
+        words = sent.split()
+        if (len(words) > 8 
+            and not is_markdown_heading(sent) 
+            and not is_markdown_list(sent)
+            and random.random() < rate
+            and i > 0):  # Never first sentence
+            starter = random.choice(informal_starters)
+            # Lowercase first word of original
+            if sent[0].isupper():
+                rest = sent[0].lower() + sent[1:]
+            else:
+                rest = sent
+            sent = f"{starter} {rest}"
+        processed.append(sent)
+    return " ".join(processed)
+
+
+def vary_punctuation(text: str) -> str:
+    """Break uniform punctuation patterns with natural variation."""
+    sentences = split_sentences(text)
+    processed = []
+    
+    for i, sent in enumerate(sentences):
+        # Occasional question instead of statement (rare, natural)
+        if i > 0 and i % 12 == 7 and "?" not in sent and len(sent.split()) < 15:
+            if random.random() < 0.3:
+                # Convert a short declarative to rhetorical question
+                words = sent.split()
+                if len(words) > 5 and words[0].lower() in {"this", "that", "these", "those", "it"}:
+                    sent = sent.rstrip(".") + "?"
+        
+        # Occasional dash usage (sparingly)
+        if i % 15 == 3 and len(sent.split()) > 10 and "—" not in sent:
+            if random.random() < 0.2 and "," in sent:
+                # Replace one comma with em-dash for emphasis
+                parts = sent.rsplit(", ", 1)
+                if len(parts) == 2 and len(parts[1].split()) > 3:
+                    sent = parts[0] + " — " + parts[1]
+        
+        processed.append(sent)
+    return " ".join(processed)
+
+
+def break_uniform_rhythm(text: str) -> str:
+    """Introduce sentence length chaos — the #1 ZeroGPT bypass signal."""
+    sentences = split_sentences(text)
+    if len(sentences) < 3:
+        return text
+    
+    processed = []
+    for i, sent in enumerate(sentences):
+        words = sent.split()
+        count = len(words)
+        
+        # Force extreme variation every few sentences
+        if i % 7 == 3 and count > 8:
+            # Create a very short punchy sentence
+            short = " ".join(words[:min(4, count)])
+            short = _safe_end(short)
+            if _has_verb(short.split()):
+                processed.append(short)
+                continue
+        
+        elif i % 11 == 5 and count < 10:
+            # Elongate a short sentence with natural continuation
+            continuations = [
+                ", which follows from the above.",
+                ", as one would expect.",
+                ", a point worth emphasizing.",
+                ", and this matters for the analysis.",
+            ]
+            sent = sent.rstrip(".") + random.choice(continuations)
+        
+        processed.append(sent)
+    
+    return " ".join(processed)
+
+
+# ===== JOURNAL REGISTER (minimal) =====
 
 _JOURNAL_SYNONYMS = {
     r"\bshows\b": ["demonstrates", "indicates", "reveals"],
     r"\bshow\b": ["demonstrate", "indicate", "reveal"],
-    r"\bbig\b": ["substantial", "considerable", "pronounced"],
-    r"\blarge\b": ["substantial", "considerable", "extensive"],
-    r"\bsmall\b": ["modest", "minor", "minimal"],
-    r"\bmake\b": ["render", "produce", "generate"],
-    r"\bmakes\b": ["renders", "produces", "generates"],
     r"\bget\b": ["obtain", "acquire", "derive"],
     r"\bgets\b": ["obtains", "acquires", "derives"],
     r"\bgot\b": ["obtained", "acquired", "derived"],
@@ -402,7 +555,7 @@ def upgrade_journal_register(text: str) -> str:
     return text
 
 
-# ===== LOCAL FALLBACK (clean and direct) =====
+# ===== LOCAL FALLBACK =====
 
 _WORD_REPLACEMENTS = {
     r"\bimportant\b":        ["key", "critical", "main", "essential"],
@@ -461,51 +614,54 @@ def local_humanize(sent: str, index: int = 0) -> str:
     return h
 
 
-# ===== SYSTEM PROMPT (fundamentally rewritten for directness) =====
+# ===== SYSTEM PROMPT (anti-detection focused) =====
 
-SYSTEM = """You are an experienced academic editor. Rewrite the provided text so it reads like natural, clear academic prose written by a competent human researcher.
+SYSTEM = """You are a human academic writer. Rewrite the provided text so it reads exactly like natural human-written academic prose — the kind a real student or researcher would submit.
 
-Your goal is to remove AI-generated patterns while preserving complete scientific accuracy, all citations, and every technical detail.
+Your goal is to make the text completely indistinguishable from human writing while keeping all facts, citations, and technical terms intact.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ABSOLUTE RULES
+CRITICAL ANTI-DETECTION RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1. PRESERVE EVERYTHING
-   Keep all facts, numbers, named entities, citations (Author, 2020), [1], [1-3], and technical terms exactly as they appear.
+1. USE CONTRACTIONS NATURALLY
+   Use "don't," "can't," "it's," "we've," "they're" occasionally. Real humans use contractions even in academic writing. Don't overdo it — 1-2 per paragraph.
 
-2. NO META-LANGUAGE
-   Never add procedural or methodological qualifiers like "in accordance with standard conditions," "within the defined scope," "subject to these parameters," "as previously described," "under the stated conditions," or "within the experimental framework" unless they literally exist in the original sentence.
+2. VARY SENTENCE LENGTH DRAMATICALLY
+   This is the #1 detector signal. Mix very short sentences (4-6 words) with medium (12-18) and long (25-35). Never let more than 2 consecutive sentences be the same length. Example pattern: 28 words → 7 words → 16 words → 5 words → 31 words.
 
-3. DIRECT AND CLEAR
-   Write directly. Do not over-hedge. One layer of qualification is enough. Do not write "it might be suggested that it could potentially be considered that" — write "this suggests that" or "we found that."
+3. START SENTENCES DIFFERENTLY
+   Vary your openers. Subject → "However," → "This" → "But" → "In 2020," → "We" → "Notably," → "It" → "So," → "That" → "Yet" → "When" → "The" → "Our" → "Interestingly," → "They" → "But" → "This" → "We" → "It" → "However,"
 
-4. NATURAL VARIATION
-   Vary sentence length naturally. Use short sentences (6-10 words) for emphasis or transition. Use medium sentences (12-20 words) for explanation. Use longer sentences (22-30 words) only when necessary for complex claims. Never force all sentences into the same length.
+4. USE INFORMAL MARKERS SPARINGLY
+   Occasionally use "honestly," "look," "the thing is," "to be fair," "admittedly," "frankly," "sure," "now," "so," "well," at the start of sentences. Not every sentence — maybe 1-2 per paragraph.
 
-5. GRAMMATICAL COMPLETENESS
-   Every sentence must have a subject and a finite verb. No fragments. No truncated thoughts.
+5. ASK RHETORICAL QUESTIONS
+   Very occasionally (1 per 2-3 paragraphs), end a short sentence with "?" instead of "." Example: "But does this hold across all populations?"
 
-6. BANNED AI PHRASES
-   Never use: delve, testament, pivotal, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is crucial to note, furthermore (as a mechanical opener), moreover (as a mechanical opener), crucially, arguably, indeed, needless to say, it goes without saying, groundbreaking, cutting-edge, state-of-the-art, revolutionary, transformative, unprecedented, foster, seamlessly, streamline, optimize, enhance, demystify.
+6. USE DASHES AND COLLOQUIAL PACING
+   Use an em-dash (—) once or twice to break a sentence for emphasis. Use a colon for dramatic pause. Real humans punctuate unpredictably.
 
-7. NATURAL CONNECTORS
-   Use transitions only when they express real logic: "However," "Thus," "Next," "In contrast," "Consequently." Do not start every sentence with a connector. Let the flow be organic.
+7. BREAK PARAGRAPH UNIFORMITY
+   Let some paragraphs be 2 sentences. Others 5-6. Never uniform 4-sentence blocks.
 
-8. AUTHORIAL VOICE
-   Use "we" or "our" 1-2 times per paragraph if it feels natural, especially when discussing findings or methods. Example: "We observed that..." or "Our results indicate..."
+8. USE "WE" AND "OUR" NATURALLY
+   1-2 times per paragraph when discussing findings. "We found that..." "Our data suggest..." "We observed..."
 
-9. SENTENCE STARTERS
-   Vary how sentences begin. Start some with the subject. Start some with "However," or "Thus." Start some with "This finding..." or "These results..." Do not use the same pattern repeatedly.
+9. DIRECT AND CLEAR
+   No meta-language. No "in accordance with standard conditions." No "within the defined scope." Write like you're explaining to a peer, not filing a compliance report.
 
-10. CLARITY OVER COMPLEXITY
-    Prefer clear, direct phrasing over compressed jargon. If a simpler word says the same thing, use it. Do not inflate vocabulary to sound "academic."
+10. BANNED AI PHRASES
+    Never use: delve, testament, pivotal, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is crucial to note, furthermore (as opener), moreover (as opener), crucially, arguably, indeed, needless to say, groundbreaking, cutting-edge, state-of-the-art, revolutionary, transformative, unprecedented, foster, seamlessly, streamline, optimize, enhance, demystify.
 
-11. MARKDOWN PRESERVATION
+11. PRESERVE EVERYTHING
+    Keep all facts, numbers, named entities, citations (Author, 2020), [1], [1-3], and technical terms exactly.
+
+12. MATCH LENGTH WITHIN ±3 WORDS
+    But don't pad artificially. If the original is 12 words, 9-15 is fine. Natural variation includes slightly shorter or longer sentences.
+
+13. MARKDOWN PRESERVATION
     Keep headings (#, ##, ###) and list items (*, 1.) exactly as written.
-
-12. WORD COUNT
-    Match the original sentence length within ±3 words. Do not pad or cut to hit an artificial target.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
@@ -513,10 +669,90 @@ OUTPUT FORMAT
 Output ONLY valid JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact original text","humanized":"your rewrite","alternatives":["alt1","alt2","alt3"]}]}]}
 
-Each alternative must be a genuinely different structural rewrite of the same sentence. Do not just swap synonyms."""
+Each alternative must be structurally different — not just synonym swaps."""
 
 
-# ===== CORRECTION LOOP (simplified) =====
+# ===== ROBUST JSON PARSING =====
+
+def robust_json_extract(text: str) -> dict:
+    """Extract valid JSON from potentially malformed LLM output."""
+    text = text.strip()
+    
+    # Remove markdown fences
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+    
+    # Try direct parse first
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    
+    # Find outermost braces
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(text[start:end+1])
+        except json.JSONDecodeError:
+            pass
+    
+    # Aggressive repair: fix common LLM JSON errors
+    # Fix unescaped quotes inside strings
+    repaired = text[start:end+1] if start != -1 and end != -1 else text
+    
+    # Replace problematic patterns
+    # Fix single quotes used as apostrophes inside double-quoted strings
+    repaired = re.sub(r'(?<<=[a-zA-Z])\'(?=[a-zA-Z])', "''", repaired)  # temporarily mark
+    repaired = re.sub(r'\'', '"', repaired)  # convert remaining single quotes
+    repaired = re.sub(r"''", "'", repaired)  # restore apostrophes
+    
+    # Fix trailing commas
+    repaired = re.sub(r',\s*}', '}', repaired)
+    repaired = re.sub(r',\s*]', ']', repaired)
+    
+    # Fix missing quotes around keys
+    repaired = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', repaired)
+    
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError as e:
+        print(f"JSON repair failed: {e}")
+        # Last resort: extract sentence data with regex
+        return _fallback_parse(text)
+
+
+def _fallback_parse(text: str) -> dict:
+    """Emergency extraction when JSON is completely broken."""
+    result = {"processed_paragraphs": []}
+    
+    # Try to find sentence pairs with regex
+    pattern = r'"original"\s*:\s*"([^"]+)"\s*,\s*"humanized"\s*:\s*"([^"]+)"'
+    matches = re.findall(pattern, text, re.DOTALL)
+    
+    if matches:
+        # Group into a single paragraph (emergency fallback)
+        sentences = []
+        for orig, hum in matches:
+            # Clean up escaped quotes
+            orig = orig.replace('\\"', '"').replace('\\\\', '\\')
+            hum = hum.replace('\\"', '"').replace('\\\\', '\\')
+            sentences.append({
+                "original": orig,
+                "humanized": hum,
+                "alternatives": [hum, hum, hum]  # Duplicates as emergency fallback
+            })
+        result["processed_paragraphs"].append({"sentences": sentences})
+    
+    return result
+
+
+# ===== CORRECTION LOOP =====
 
 def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str:
     orig_count = count_words(original)
@@ -528,17 +764,17 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
     for attempt in range(max_attempts):
         try:
             prompt = (
-                f"This rewrite is off by {abs(orig_count - hum_count)} words.\n"
-                f"Original ({orig_count} words): {original}\n"
-                f"Rewrite ({hum_count} words): {humanized}\n\n"
-                f"Adjust to exactly {orig_count} words (±2 tolerance). "
-                f"Keep all facts and terms. Write directly. No meta-language. "
-                f"Output ONLY the corrected sentence, no quotes."
+                f"Fix the word count. Original: {orig_count} words. "
+                f"Yours: {hum_count} words. Target: {orig_count} (±2).\n\n"
+                f'Original: "{original}"\n'
+                f'Rewrite: "{humanized}"\n\n'
+                f"Output ONLY the corrected sentence. Use contractions naturally. "
+                f"Vary sentence structure. No meta-language. No banned AI phrases."
             )
             resp = client.chat.complete(
                 model="mistral-large-latest",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
+                temperature=0.3,
                 max_tokens=200,
             )
             corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
@@ -565,7 +801,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
             lines.append(f"{j + 1}. [{count_words(s)} words] {s}")
         lines.append("")
 
-    data         = None
+    data = None
     mistral_error = None
 
     try:
@@ -577,33 +813,26 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                     "role": "user",
                     "content": (
                         f"Style: {style}\n\n"
-                        "Rewrite this academic text to read as natural human-written prose. "
-                        "Remove AI patterns. Preserve all facts and citations. "
-                        "Word counts are in [brackets] — match within ±3 words. "
-                        "No meta-language. Direct and clear. "
+                        "Rewrite this academic text to read as completely natural human writing. "
+                        "Use contractions, vary sentence length dramatically, start sentences differently, "
+                        "add occasional informal markers, use rhetorical questions sparingly. "
+                        "Word counts in [brackets] — match within ±3 words. "
+                        "Preserve all facts, citations, and technical terms. "
+                        "No meta-language. No banned phrases. "
                         "Preserve markdown headings and lists exactly.\n\n"
                         + "\n".join(lines)
                     ),
                 },
             ],
-            temperature=0.5,
+            temperature=0.65,
             max_tokens=4000,
             response_format={"type": "json_object"},
         )
         text = resp.choices[0].message.content.strip()
-
-        if text.startswith("```json"):
-            text = text[7:]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-
-        start, end = text.find("{"), text.rfind("}")
-        if start != -1 and end != -1:
-            text = text[start: end + 1]
-
-        data = json.loads(text)
-        print("Mistral JSON parsed successfully")
+        print(f"RAW RESPONSE (first 500 chars): {text[:500]}")
+        
+        data = robust_json_extract(text)
+        print("JSON parsed successfully")
     except Exception as e:
         mistral_error = str(e)
         print(f"Mistral FAILED: {e}")
@@ -637,29 +866,39 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
 
         for j, sent in enumerate(para.get("sentences", [])):
             orig = sent.get("original", "")
-            h    = sent.get("humanized", "") or local_humanize(orig, j)
-            h    = correction_loop(orig, h)
-            h    = enforce_length_constraint(orig, h, max_diff=3)
+            h = sent.get("humanized", "") or local_humanize(orig, j)
+            h = correction_loop(orig, h)
+            h = enforce_length_constraint(orig, h, max_diff=3)
             para_sentences.append({
-                "orig":     orig,
-                "hum":      h,
+                "orig": orig,
+                "hum": h,
                 "raw_alts": sent.get("alternatives", [])[:3],
             })
 
-        # Post-processing: minimal and clean
+        # Apply anti-detection layers in specific order
         for j, sent_data in enumerate(para_sentences):
             h = sent_data["hum"]
             
-            # Gentle repetition cleanup only
+            # Layer 1: Break uniform rhythm (sentence length chaos)
+            h = break_uniform_rhythm(h)
+            
+            # Layer 2: Natural contractions
+            h = apply_contractions(h, rate=0.12)
+            
+            # Layer 3: Occasional informal markers
+            h = apply_informal_markers(h, rate=0.06)
+            
+            # Layer 4: Punctuation variation
+            h = vary_punctuation(h)
+            
+            # Layer 5: Gentle repetition cleanup
             h = eliminate_repetition(h)
             
-            # Minimal register upgrade (only for truly informal words)
+            # Layer 6: Minimal register upgrade
             h = upgrade_journal_register(h)
             
-            # Final loose length check
+            # Layer 7: Final length and safety
             h = enforce_length_constraint(sent_data["orig"], h, max_diff=5)
-            
-            # Clean spacing and punctuation
             h = re.sub(r"\s{2,}", " ", h)
             h = _safe_end(h.strip())
             
@@ -671,6 +910,8 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 alt = alt or local_humanize(sent_data["orig"], idx + 100)
                 alt = correction_loop(sent_data["orig"], alt)
                 alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=3)
+                alt = break_uniform_rhythm(alt)
+                alt = apply_contractions(alt, rate=0.10)
                 alt = eliminate_repetition(alt)
                 alt = upgrade_journal_register(alt)
                 alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
@@ -678,7 +919,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 alt = _safe_end(alt.strip())
                 clean_alts.append(alt)
 
-            # Deduplicate alternatives
+            # Deduplicate
             orig_lower = sent_data["orig"].lower().strip()
             unique_alts: List[str] = []
             seen_lowers: set = set()
@@ -692,6 +933,8 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
             seed = 200
             while len(unique_alts) < 3:
                 fallback = local_humanize(sent_data["orig"], seed)
+                fallback = break_uniform_rhythm(fallback)
+                fallback = apply_contractions(fallback, rate=0.10)
                 fallback = enforce_length_constraint(sent_data["orig"], fallback, max_diff=3)
                 fl = fallback.lower().strip()
                 if fl != orig_lower and fl not in seen_lowers and len(fallback.split()) > 3:
@@ -719,10 +962,10 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
 async def process(req: ProcessRequest):
     if not req.text.strip():
         raise HTTPException(400, "Empty text")
-    pars     = split_paragraphs(req.text)
+    pars = split_paragraphs(req.text)
     processed = humanize_with_mistral(pars, req.style)
-    all_s    = [s for p in processed for s in p.sentences]
-    avg      = sum(s.score for s in all_s) / len(all_s) if all_s else 0
+    all_s = [s for p in processed for s in p.sentences]
+    avg = sum(s.score for s in all_s) / len(all_s) if all_s else 0
     return ProcessResponse(
         processed_paragraphs=processed,
         total_sentences=len(all_s),
