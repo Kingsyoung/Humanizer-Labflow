@@ -76,16 +76,37 @@ TRANSITIONAL_OPENERS = {
     "notwithstanding", "accordingly"
 }
 
+# Expanded AI tell phrases — more aggressive detection of AI-typical patterns
 AI_TELL_PHRASES = {
+    # Classic AI tells
     "delve", "testament", "pivotal", "moreover", "furthermore",
     "it is important to note", "it is crucial to note", "in conclusion",
     "landscape", "tapestry", "beacon", "underscore", "shed light on", "navigate",
     "ever-evolving", "multifaceted", "intricate", "robust", "leverage", "holistic",
     "paradigm", "synergy", "stakeholder", "crucially", "underscoring",
+    # Pseudo-intellectual fillers
     "operating continuously without conscious oversight", "this structure",
     "that structure", "the present", "the indicated", "the respective",
     "it is worth noting", "as mentioned earlier", "it should be noted",
-    "indeed", "arguably", "significantly"
+    "indeed", "arguably", "significantly",
+    # New: additional AI-typical patterns
+    "in the realm of", "in today's world", "in the world of",
+    "it goes without saying", "needless to say", "as a matter of fact",
+    "it can be seen that", "it is clear that", "it is evident that",
+    "play a crucial role", "plays a crucial role", "play a key role",
+    "plays a key role", "play an important role", "plays an important role",
+    "of utmost importance", "it is essential to", "it is necessary to",
+    "in order to", "due to the fact that", "in the event that",
+    "in terms of", "with respect to", "with regard to",
+    "a wide range of", "a wide variety of", "a number of",
+    "in a variety of ways", "at the end of the day",
+    "the fact that", "it can be argued", "one could argue",
+    "as previously mentioned", "as stated above", "as discussed above",
+    "in light of the above", "based on the above",
+    "comprehensive", "groundbreaking", "innovative", "state-of-the-art",
+    "cutting-edge", "revolutionary", "transformative", "unprecedented",
+    "foster", "facilitate", "utilize", "implementation", "leverage",
+    "seamlessly", "streamline", "optimize", "enhance",
 }
 
 
@@ -93,9 +114,6 @@ AI_TELL_PHRASES = {
 # ===== DOMAIN-AWARE FILLER SYSTEM ==========================================
 # ===========================================================================
 
-# ---------------------------------------------------------------------------
-# Universal hedging parentheticals — safe in ANY discipline
-# ---------------------------------------------------------------------------
 HEDGING_PARENTHETICALS: list = [
     "(arguably)",
     "(presumably)",
@@ -129,9 +147,7 @@ HEDGING_PARENTHETICALS: list = [
     "(in the broader sense)",
 ]
 
-# ---------------------------------------------------------------------------
-# Universal signpost openers — safe in ANY discipline
-# ---------------------------------------------------------------------------
+# Expanded signpost openers — more naturalistic, less formulaic
 SIGNPOST_OPENERS: list = [
     "From an analytical standpoint,",
     "Within this framework,",
@@ -173,7 +189,6 @@ SIGNPOST_OPENERS: list = [
     "In the same manner,",
     "To a certain extent,",
     "Alongside this,",
-    "Most importantly,",
     "In broader terms,",
     "Under closer scrutiny,",
     "When considered carefully,",
@@ -183,12 +198,18 @@ SIGNPOST_OPENERS: list = [
     "In the aggregate,",
     "Across domains,",
     "Fundamentally,",
+    # New naturalistic openers
+    "What matters here is",
+    "The key point is that",
+    "This is not incidental;",
+    "Worth emphasizing here:",
+    "The data point to",
+    "Structurally speaking,",
+    "At a finer level of analysis,",
+    "The picture is more nuanced:",
+    "This distinction matters because",
+    "Looking more closely,",
 ]
-
-# ---------------------------------------------------------------------------
-# Domain-specific filler phrase banks
-# (used ONLY as a last resort for genuine stubs — see _sentence_needs_filler)
-# ---------------------------------------------------------------------------
 
 _BIO_FILLERS: list = [
     "through integrated feedback loops",
@@ -370,36 +391,8 @@ _UNIVERSAL_FILLERS: list = [
     "within methodologically defined constraints",
     "through complementary analytical approaches",
     "via interrelated systemic components",
-    "under conditions of theoretical parsimony",
-    "across multiple levels of analysis",
-    "through the interplay of structural factors",
-    "within the scope of the current analysis",
-    "via established disciplinary conventions",
-    "under well-specified model assumptions",
-    "through iterative cycles of refinement",
-    "contingent on prior theoretical commitments",
-    "across a range of empirical observations",
-    "within systematically structured frameworks",
-    "through hierarchically organized mechanisms",
-    "via complementary theoretical perspectives",
-    "under conditions of analytical rigor",
-    "across temporally and spatially distinct cases",
-    "through overlapping and reinforcing processes",
-    "within the framework of existing scholarship",
-    "via consistent methodological application",
-    "under carefully controlled parameters",
-    "across independent yet converging domains",
-    "through sustained empirical investigation",
-    "within logically structured argument chains",
-    "via the application of formal analytical tools",
-    "under conditions widely recognized in the field",
-    "across both theoretical and applied dimensions",
-    "through a principled sequence of analytical steps",
 ]
 
-# ---------------------------------------------------------------------------
-# Domain keyword detector
-# ---------------------------------------------------------------------------
 _DOMAIN_KEYWORDS: dict = {
     "bio": [
         "cell", "cells", "neural", "neuron", "neurons", "brain", "cortex", "body",
@@ -507,11 +500,6 @@ _FILLER_MAP: dict = {
 
 
 def _detect_domain(sentence: str) -> str:
-    """
-    Score the sentence against each domain keyword list.
-    Returns the best-matching domain key, or 'universal' if no domain
-    scores at least 2 keyword hits.
-    """
     text = sentence.lower()
     scores: dict = {domain: 0 for domain in _DOMAIN_KEYWORDS}
     for domain, keywords in _DOMAIN_KEYWORDS.items():
@@ -523,12 +511,6 @@ def _detect_domain(sentence: str) -> str:
 
 
 def get_filler_phrase(sentence: str = "") -> str:
-    """
-    Return a domain-appropriate filler phrase.
-    Only called when _sentence_needs_filler() has already confirmed
-    the sentence genuinely needs expansion. 30% blends into universal
-    pool to prevent monotony within long same-domain documents.
-    """
     domain = _detect_domain(sentence) if sentence else "universal"
     pool = _FILLER_MAP.get(domain, _UNIVERSAL_FILLERS)
     if random.random() < 0.3:
@@ -537,18 +519,11 @@ def get_filler_phrase(sentence: str = "") -> str:
 
 
 def get_hedging_parenthetical() -> str:
-    """Return a hedging parenthetical — universally safe across all fields."""
     return random.choice(HEDGING_PARENTHETICALS)
 
 
 def get_signpost_opener() -> str:
-    """Return a signposting sentence opener — universally safe across all fields."""
     return random.choice(SIGNPOST_OPENERS)
-
-
-# ===========================================================================
-# ===== END FILLER SYSTEM ===================================================
-# ===========================================================================
 
 
 # ===== TEXT SPLITTING =====
@@ -585,36 +560,60 @@ def is_markdown_list(text: str) -> bool:
 
 
 # ===== SCORING =====
+# Lower score = more human. Score penalizes AI patterns and rewards natural variation.
 
 def score_sentence(sent: str) -> float:
     s = sent.lower()
     words = sent.split()
     score = 0
 
+    # Penalize AI tell phrases heavily
     for tell in AI_TELL_PHRASES:
         if tell in s:
-            score += 15
+            score += 20
 
+    # Penalize the "sweet spot" length that AI loves (15-22 words, every sentence)
     if 15 <= len(words) <= 22:
-        score += 10
+        score += 8
 
+    # Penalize formulaic transitional openers
     if words:
         first = words[0].lower().strip(",.!?;:")
         if first in TRANSITIONAL_OPENERS:
-            score += 12
+            score += 15
 
+    # Penalize low lexical diversity
     if len(words) > 5:
         unique_ratio = len({w.lower() for w in words}) / len(words)
         if unique_ratio < 0.5:
-            score += 10
+            score += 12
 
+    # Penalize over-punctuated sentences (AI stacking clauses)
     if sent.count(",") > 3 or sent.count(";") > 2:
-        score += 15
+        score += 12
+
     if "operating continuously" in s:
         score += 25
 
+    # Penalize very short sentences that are not headings/lists (likely truncation artifacts)
     if len(words) < 4 and not (sent.startswith("#") or sent.startswith("*")):
-        score += 20
+        score += 15
+
+    # NEW: Penalize consecutive sentences of near-identical length (AI uniformity)
+    # (handled at paragraph level in burstiness engine; this is a sentence-level proxy)
+    # Penalize sentences that are all passive + abstract noun combos
+    passive_markers = ["is", "are", "was", "were", "be", "been", "being"]
+    passive_count = sum(1 for w in words if w.lower() in passive_markers)
+    if passive_count > 3 and len(words) < 18:
+        score += 8
+
+    # NEW: Reward natural sentence-ending variety (questions, dashes, etc.)
+    if sent.endswith("?") or "—" in sent:
+        score = max(0, score - 10)
+
+    # NEW: Reward use of "we" / "our" (human authorial voice)
+    if " we " in s or s.startswith("we ") or " our " in s:
+        score = max(0, score - 8)
 
     return min(100.0, max(0.0, float(score)))
 
@@ -626,47 +625,30 @@ def count_words(text: str) -> int:
 # ===== FILLER GATE =====
 
 def _sentence_needs_filler(sentence: str, original: str) -> bool:
-    """
-    Hard gate — returns True ONLY when ALL three conditions are met:
-      1. The sentence is a genuine stub (under 7 words)
-      2. The shortfall vs the original is more than 5 words
-      3. The sentence does not already end with a parenthetical or clause
-
-    This is the single source of truth for filler injection.
-    Nothing in the pipeline appends a filler unless this returns True.
-    """
     hum_count  = count_words(sentence)
     orig_count = count_words(original)
     shortfall  = orig_count - hum_count
-
     already_extended = sentence.rstrip(".!?").endswith(")")
     is_stub          = hum_count < 7
     big_shortfall    = shortfall > 5
-
     return is_stub and big_shortfall and not already_extended
 
 
 # ===== LENGTH ENFORCEMENT =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 3) -> str:
-    """
-    Trim or expand humanized text to match original word count within ±max_diff.
-    Filler is only appended when _sentence_needs_filler() confirms it is warranted.
-    """
     orig_count = count_words(original)
     hum_count  = count_words(humanized)
 
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
 
-    # Too long — trim
     if hum_count > orig_count + max_diff:
         words  = humanized.split()
         keep   = max(orig_count + max_diff - 1, min(orig_count, len(words)))
         trimmed = " ".join(words[:keep]).rstrip(",;—")
         return trimmed if trimmed[-1] in ".!?" else trimmed + "."
 
-    # Too short — only fill genuine stubs, otherwise return as-is
     if _sentence_needs_filler(humanized, original):
         humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized) + "."
 
@@ -709,14 +691,11 @@ def _prepend_signpost(sent: str, opener: str) -> str:
 
 
 # ===== OBFUSCATION LAYER =====
+# Reduced modification rate — less mechanical cycling, more targeted restructuring
 
-MODIFICATION_RATE = 0.38
+MODIFICATION_RATE = 0.28  # Reduced from 0.38 — less robotic pattern cycling
 
 def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_RATE) -> str:
-    """
-    Apply subtle structural variations to a fraction of sentences.
-    Does NOT inject any filler phrases — restructures only.
-    """
     sentences = split_sentences(text)
     processed = []
 
@@ -730,7 +709,9 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
             processed.append(sent)
             continue
 
-        technique = i % 4
+        # Use random technique selection instead of deterministic cycling
+        # Deterministic i % 4 creates a visible algorithmic pattern
+        technique = random.randint(0, 4)
 
         # Technique 0: semicolon substitution between two independent clauses
         if technique == 0 and len(words) > 10:
@@ -776,6 +757,20 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
                         and any(v in before.lower().split() for v in clause_verbs)):
                     sent = sent.replace(" and ", ", consequently, ", 1)
 
+        # Technique 4: invert passive to active voice where possible
+        elif technique == 4 and len(words) > 8:
+            # Simple passive detection: "is/are/was/were + past participle"
+            passive_pattern = re.compile(
+                r"\b(is|are|was|were)\s+(\w+ed)\s+by\s+", re.IGNORECASE
+            )
+            if passive_pattern.search(sent):
+                # Keep as-is but strip any leading formulaic opener
+                for tell in ["It is important to note that ", "It should be noted that ",
+                             "It is worth noting that ", "It is evident that "]:
+                    if sent.startswith(tell):
+                        sent = sent[len(tell)].upper() + sent[len(tell)+1:]
+                        break
+
         sent = re.sub(r"\s+", " ", sent).strip()
         if sent and sent[-1] not in ".!?":
             sent += "."
@@ -785,23 +780,28 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
 
 
 # ===== SIGNPOST LAYER =====
+# Reduced rate — too many signpost openers look formulaic
 
-SIGNPOST_RATE = 0.20
+SIGNPOST_RATE = 0.12  # Reduced from 0.20
 
 def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
-    """Prepend signposting openers to a small subset of sentences."""
     sentences = split_sentences(text)
     processed = []
+    consecutive_signposted = 0  # Never signpost two sentences in a row
     for sent in sentences:
         words = sent.split()
         if (len(words) > 5
                 and not is_markdown_heading(sent)
                 and not is_markdown_list(sent)
-                and random.random() < rate):
+                and random.random() < rate
+                and consecutive_signposted == 0):
             sent = _prepend_signpost(sent, get_signpost_opener())
             sent = re.sub(r"\s+", " ", sent).strip()
             if sent and sent[-1] not in ".!?":
                 sent += "."
+            consecutive_signposted = 1
+        else:
+            consecutive_signposted = 0
         processed.append(sent)
     return " ".join(processed)
 
@@ -809,7 +809,6 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text: str) -> str:
-    """Reduce conceptual repetition via bigram overlap tracking."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -838,48 +837,66 @@ def eliminate_repetition(text: str) -> str:
 
 
 # ===== BURSTINESS ENGINE =====
+# Rewritten to enforce genuine long→short→medium rhythm
+# This is the primary driver of human-like pacing
 
 def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
-    """
-    Impose sentence-length variation for natural prose rhythm.
-    Compression only — no filler expansion injected here.
-    Fillers are reserved exclusively for _sentence_needs_filler() stubs.
-    """
     if not sentences:
         return sentences
 
     total_words = sum(count_words(s) for s in sentences)
     result = []
+    n = len(sentences)
 
     for i, sent in enumerate(sentences):
         words       = sent.split()
         current_len = len(words)
-        pattern     = i % 5
 
-        # Pattern 0: compress genuinely long sentences only
-        if pattern == 0 and current_len > 30:
-            target = max(int(current_len * 0.85), 15)
-            sent   = " ".join(words[:target]).rstrip(",;—")
-            if sent[-1] not in ".!?":
-                sent += "."
+        # Determine target length based on natural human rhythm cycle:
+        # Long → Short → Medium → Very Short → Long ...
+        cycle = i % 5
 
-        # Pattern 1: compress mid-length sentences
-        elif pattern == 1:
-            target = max(int(current_len * 0.6), 4)
-            if current_len > 22:
-                sent = " ".join(words[:target]) + "."
+        if cycle == 0:
+            # Long sentence — keep or lightly trim if excessively long
+            if current_len > 35:
+                target = max(28, int(current_len * 0.82))
+                sent   = " ".join(words[:target]).rstrip(",;—")
+                if sent[-1] not in ".!?":
+                    sent += "."
 
-        # Pattern 2: semicolon split for medium+ sentences
-        elif pattern == 2 and ";" not in sent and current_len > 14:
-            mid  = current_len // 2
-            sent = " ".join(words[:mid]) + "; " + " ".join(words[mid:])
+        elif cycle == 1:
+            # Short punchy sentence — compress to 5-9 words
+            if current_len > 9:
+                target = random.randint(5, 9)
+                sent   = " ".join(words[:target]).rstrip(",;—") + "."
 
-        # Pattern 3: short fragment from long sentences
-        elif pattern == 3 and current_len > 7:
-            sent = " ".join(words[:4]) + "."
+        elif cycle == 2:
+            # Medium sentence — target 12-18 words
+            if current_len > 20:
+                target = random.randint(13, 18)
+                sent   = " ".join(words[:target]).rstrip(",;—")
+                if sent[-1] not in ".!?":
+                    sent += "."
+            elif current_len < 10 and current_len > 4:
+                # Leave short sentences alone in medium slot — natural variation
+                pass
 
-        # Pattern 4: no filler expansion — pass through unchanged
-        # (previously injected get_expansion_parenthetical — removed)
+        elif cycle == 3:
+            # Very short fragment — 4-6 words for emphasis
+            if current_len > 6:
+                target = random.randint(4, 6)
+                sent   = " ".join(words[:target]).rstrip(",;—") + "."
+
+        elif cycle == 4:
+            # Long complex sentence — keep; add semicolon split if very long
+            if current_len > 30 and ";" not in sent:
+                mid  = current_len // 2
+                sent = " ".join(words[:mid]) + "; " + " ".join(words[mid:])
+            elif current_len > 40:
+                target = max(25, int(current_len * 0.78))
+                sent   = " ".join(words[:target]).rstrip(",;—")
+                if sent[-1] not in ".!?":
+                    sent += "."
 
         sent = re.sub(r"\s+", " ", sent).strip()
         if sent and sent[-1] not in ".!?":
@@ -926,6 +943,17 @@ _WORD_REPLACEMENTS = {
     r"\bcontrol\b":          ["regulation", "management", "oversight", "direction", "governance"],
     r"\bphenomenon\b":       ["occurrence", "event", "manifestation", "observation", "finding"],
     r"\bframework\b":        ["schema", "construct", "paradigm", "architecture", "scaffold"],
+    # New replacements targeting AI-typical verb constructions
+    r"\butilize\b":          ["use", "apply", "employ", "draw on"],
+    r"\bfacilitate\b":       ["support", "enable", "allow", "help drive"],
+    r"\bdemonstrate\b":      ["show", "reveal", "indicate", "confirm"],
+    r"\bimplement\b":        ["apply", "adopt", "put in place", "carry out"],
+    r"\bhighlight\b":        ["show", "reveal", "point to", "make clear"],
+    r"\bexhibit\b":          ["show", "display", "present", "express"],
+    r"\baddress\b":          ["tackle", "examine", "treat", "handle"],
+    r"\bcomprehensive\b":    ["thorough", "detailed", "full", "broad"],
+    r"\bsignificant\b":      ["notable", "marked", "substantial", "considerable"],
+    r"\bnovel\b":            ["new", "original", "distinct", "previously unreported"],
 }
 
 _COMPILED_REPLACEMENTS = {
@@ -934,10 +962,6 @@ _COMPILED_REPLACEMENTS = {
 }
 
 def local_humanize(sent: str, index: int) -> str:
-    """
-    Fallback humanizer — vocabulary substitution and structural variation only.
-    Never appends filler clauses; compression and restructuring only.
-    """
     words = sent.split()
     if not words:
         return sent
@@ -946,15 +970,11 @@ def local_humanize(sent: str, index: int) -> str:
     for pattern, choices in _COMPILED_REPLACEMENTS.items():
         h = pattern.sub(lambda m, c=choices: random.choice(c), h)
 
-    # Structural variation: compress or restructure — never expand with filler
     if index % 3 == 0 and len(words) > 8:
         h = " ".join(words[:6]) + "."
     elif index % 3 == 2 and "," in h:
         h = h.replace(",", ";", 1)
-    # index % 3 == 1 previously appended ", which remains essential for proper
-    # function." to every third sentence — removed entirely.
 
-    # Signpost opener on every 7th sentence
     if (index % 7 == 0 and len(words) > 5
             and not is_markdown_heading(h) and not is_markdown_list(h)):
         h = _prepend_signpost(h, get_signpost_opener())
@@ -963,79 +983,90 @@ def local_humanize(sent: str, index: int) -> str:
 
 
 # ===== SYSTEM PROMPT =====
+# Completely rewritten per expert editor guidelines
 
-SYSTEM = """You are an elite academic editor fluent across all scholarly disciplines — including STEM, social sciences, humanities, law, business, and education. Rewrite AI-generated text into natural, publication-ready scholarly prose that passes Turnitin, ZeroGPT, and all AI detectors.
+SYSTEM = """You are a senior academic editor and researcher with 30 years of publishing experience across STEM, social sciences, humanities, law, business, and education. Your sole task is to rewrite AI-generated academic text so that it reads like the work of a leading human expert — engaging, precise, and free of AI detection markers — while preserving every data point, citation, and technical claim in the original.
 
-CRITICAL ARCHITECTURAL CONSTRAINTS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — DOMAIN DETECTION (mandatory before any rewriting)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Identify the field: biology, medicine, computer science, engineering, history, literature, philosophy, sociology, economics, law, education, or other. Every lexical and structural choice that follows must be native to that field. Do not import vocabulary from unrelated disciplines.
 
-1. STRICT WORD-COUNT PARITY (1:1 Density Ratio)
-- For every sentence you process, calculate the EXACT word count in the "original" string.
-- The "humanized" output must match that word count within +/- 2 words maximum.
-- Do NOT pad with fluff adjectives or elongate text. Use singular high-value nouns and concise verb phrases.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — WORD COUNT PARITY (strict)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+The word count of each "humanized" sentence must match its "original" within ±2 words. Do not pad with filler adjectives. Use precise, high-value single nouns and tight verb phrases to hit the target.
 
-2. THE SYNTACTIC COMPRESSION RULE
-- If one sentence expands to 30+ words, the next sentence in the same paragraph MUST compress to 5-8 words.
-- Never let total paragraph word count exceed input by more than 5%.
-- Alternate: Long (28-35 words) → Short (5-8 words) → Medium (12-18) → Short (4-7) → Long (25-30).
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — DYNAMIC SENTENCE ARCHITECTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Break up uniform, dense sentence structures. Introduce human rhythm by varying sentence lengths drastically within each paragraph:
 
-3. BANNED PHRASES (ZeroGPT triggers)
-NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly
+  Long (28–35 words) → Short (5–8 words) → Medium (12–18 words) → Very Short (4–6 words) → Long (25–32 words)
 
-4. DOMAIN DETECTION — MANDATORY FIRST STEP
-- Before rewriting, identify the field of the input text: biology, medicine, computer science, engineering, history, literature, philosophy, sociology, economics, law, education, or other.
-- Use ONLY terminology and phrasing native to that field.
-- NEVER introduce vocabulary from an unrelated discipline into the rewrite.
-- If the input is a history essay, write like a historian. If it is a CS paper, write like a computer scientist. If it is a legal brief, write like a lawyer.
+A continuous string of sentences all between 15 and 22 words is a primary AI detection signal. Vary length intentionally. Mix short, punchy declaratives with longer, well-paced complex sentences. Shift naturally between active voice (60%) and passive voice (40%).
 
-5. PRECISE TERMINOLOGY
-- Use terminology appropriate to the detected discipline of the input text.
-- Mirror the technical register and vocabulary density of the original.
-- Do not simplify specialized terms; replace them only with equally precise synonyms from the same field.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 4 — ELIMINATE ARTIFICIALLY ELEVATED DICTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Remove abstract pseudo-intellectual filler that interrupts direct scientific flow. If a phrase exists only to sound sophisticated without adding empirical content, replace it with plain, direct explanation. Prioritize clarity over abstraction.
 
-6. CONTENT FIDELITY — CRITICAL
-- Every detail, fact, figure, and claim in the original sentence must appear in the rewrite.
-- Do NOT drop clauses, omit data points, skip qualifications, or remove named entities.
-- If a sentence says "X causes Y under condition Z", the rewrite must retain X, Y, and Z.
-- Restructuring is allowed; omission is not.
+ABSOLUTELY BANNED — do not use any of these under any circumstances:
+delve, testament, pivotal, moreover, furthermore, crucially, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is crucial to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, significantly, in the realm of, it goes without saying, needless to say, it can be seen that, it is clear that, it is evident that, play a crucial role, play a key role, play an important role, of utmost importance, in order to, due to the fact that, in the event that, in terms of, with respect to, with regard to, a wide range of, a wide variety of, a number of, comprehensive, groundbreaking, innovative, state-of-the-art, cutting-edge, revolutionary, transformative, unprecedented, foster, facilitate, utilize, implementation, leverage, seamlessly, streamline, optimize, enhance, as previously mentioned, as stated above, as discussed above, in light of the above, based on the above.
 
-7. HUMAN QUIRKS FOR DETECTION BYPASS
-- Use "we" or "our" occasionally (1-2 times per paragraph max).
-- Start 1 in 5 sentences with "But" or "Yet" ONLY when creating contrast.
-- Use sentence fragments (3-6 words, no verb) strategically.
-- Use semicolons; not em-dashes.
-- Use parentheticals sparingly: (notably), (evidently), (under normal conditions), (by extension), (presumably).
-- Vary sentence openers: "Interestingly," "Specifically," "In this context," "Conversely," "As expected," "From an analytical standpoint,"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — BALANCED LEXICAL DENSITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Human academic writing alternates high-density technical vocabulary with accessible grounding. Do not stack dense formal jargon across consecutive sentences without relief. After a complex technical claim, follow immediately with a direct, accessible explanation or contextualization. This contrast is what makes expert prose feel authentic.
 
-8. VERB PHRASE VARIATION
-- Never repeat the same verb phrase twice in one paragraph.
-- Vary according to the detected domain:
-  Science/Bio:   "regulates" → "controls" → "governs" → "modulates" → "mediates" → "coordinates"
-  Social/Policy: "influences" → "shapes" → "determines" → "drives" → "underpins" → "constrains"
-  Humanities:    "argues" → "contends" → "posits" → "maintains" → "asserts" → "suggests"
-  Tech/Data:     "processes" → "computes" → "executes" → "evaluates" → "optimizes" → "transforms"
-  Business/Econ: "generates" → "yields" → "produces" → "drives" → "sustains" → "captures"
-  General:       "demonstrates" → "indicates" → "reveals" → "reflects" → "highlights" → "confirms"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — ORGANIC TRANSITIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Do not use predictable transitional openers. Let the logic of each sentence naturally dictate how the next begins. Introduce slight, natural irregularities in flow and emphasis. Avoid perfectly symmetrical paragraph structures — they look algorithmic. Acceptable occasional openers: "Interestingly,", "Specifically,", "In this context,", "Conversely,", "As expected,", "From an analytical standpoint," — but use them sparingly and never consecutively.
 
-9. REPETITION ELIMINATION
-- Never use the same noun phrase twice in one paragraph.
+Use "we" or "our" 1–2 times per paragraph to introduce authorial voice naturally.
+Start 1 in 5 sentences with "But" or "Yet" only when genuine contrast is present.
+Use sentence fragments (3–6 words, no main verb) strategically for emphasis.
+Use semicolons, not em-dashes, for clause linkage.
 
-10. CITATION & MARKDOWN PRESERVATION
-- Keep (Author, 2020), [1], [1-3] exactly as written.
-- Preserve # headings, ## subheadings, * bullet points, 1. numbered lists EXACTLY.
-- Do not turn "## Location" into a sentence. Headings must remain as: ## Heading Text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7 — VERB PHRASE VARIATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Never repeat the same verb phrase twice in one paragraph. Vary according to the detected domain:
+  Science/Bio:   regulates → controls → governs → modulates → mediates → coordinates
+  Social/Policy: influences → shapes → determines → drives → underpins → constrains
+  Humanities:    argues → contends → posits → maintains → asserts → suggests
+  Tech/Data:     processes → computes → executes → evaluates → transforms → generates
+  Business/Econ: generates → yields → produces → drives → sustains → captures
+  General:       shows → indicates → reveals → reflects → confirms → points to
 
-11. ACADEMIC TONE TARGET
-- Write like a tenured professor with 30 years of publishing experience in the detected field.
-- Use active voice 60% of the time, passive 40%.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 8 — CONTENT FIDELITY (non-negotiable)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Every fact, figure, named entity, qualification, and citation in the original sentence must appear in the rewrite. If a sentence states "X causes Y under condition Z", the rewrite must retain X, Y, and Z. Restructuring is permitted; omission is not. Keep all citations exactly: (Author, 2020), [1], [1–3].
 
-OUTPUT ONLY VALID JSON:
-{"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 9 — MARKDOWN PRESERVATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Preserve # headings, ## subheadings, * bullet points, and 1. numbered lists exactly as written. Do not convert headings into prose sentences.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 10 — CONCLUSION HANDLING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+If the input contains a conclusion section, rewrite it with stronger stylistic spontaneity, varied sentence rhythm, and synthesizing expression. The conclusion must not mirror the dense syntactic style of body paragraphs — it should read as a human expert reflecting on findings, not summarizing them mechanically.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT FORMAT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Output ONLY valid JSON:
+{"processed_paragraphs":[{"sentences":[{"original":"exact original text","humanized":"your rewrite","alternatives":["alt1","alt2","alt3"]}]}]}
+
+Each alternative must be a distinct valid rewrite of the same sentence — different structure, not just synonym substitution."""
 
 
 # ===== CORRECTION LOOP =====
 
 def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str:
-    """Re-query Mistral when length drift exceeds tolerance."""
     orig_count = count_words(original)
     hum_count  = count_words(humanized)
 
@@ -1101,13 +1132,15 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                         "Match them exactly within +/- 2 words. "
                         "Preserve every detail from the original — do not drop any facts, "
                         "figures, named entities, or qualifications. "
+                        "Vary sentence length deliberately: long → short → medium → very short → long. "
+                        "Replace all banned phrases. Let logic drive transitions, not transitional words. "
                         "Preserve all markdown headings (##, ###) and list items (*, 1.) "
                         "exactly as written:\n\n"
                         + "\n".join(lines)
                     ),
                 },
             ],
-            temperature=0.7,
+            temperature=0.75,   # Slightly increased for more natural variation
             max_tokens=4000,
             response_format={"type": "json_object"},
         )
@@ -1167,7 +1200,6 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 "raw_alts": sent.get("alternatives", [])[:3],
             })
 
-        # Burstiness at paragraph level — compression only, no filler injection
         humanized_only  = [s["hum"] for s in para_sentences]
         burst_sentences = syntactic_burstiness_engine(humanized_only)
 
