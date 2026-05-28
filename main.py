@@ -600,19 +600,17 @@ def score_sentence(sent: str) -> float:
     if len(words) < 4 and not (sent.startswith("#") or sent.startswith("*")):
         score += 15
 
-    # NEW: Penalize consecutive sentences of near-identical length (AI uniformity)
-    # (handled at paragraph level in burstiness engine; this is a sentence-level proxy)
     # Penalize sentences that are all passive + abstract noun combos
     passive_markers = ["is", "are", "was", "were", "be", "been", "being"]
     passive_count = sum(1 for w in words if w.lower() in passive_markers)
     if passive_count > 3 and len(words) < 18:
         score += 8
 
-    # NEW: Reward natural sentence-ending variety (questions, dashes, etc.)
+    # Reward natural sentence-ending variety (questions, dashes, etc.)
     if sent.endswith("?") or "—" in sent:
         score = max(0, score - 10)
 
-    # NEW: Reward use of "we" / "our" (human authorial voice)
+    # Reward use of "we" / "our" (human authorial voice)
     if " we " in s or s.startswith("we ") or " our " in s:
         score = max(0, score - 8)
 
@@ -1167,8 +1165,8 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 f"The following rewritten academic sentence violates our strict length constraint.\n"
                 f"Original word count: {orig_count} words.\n"
                 f"Your rewrite count: {hum_count} words.\n\n"
-                f"Original: \"{original}\"\n"
-                f"Your Rewrite: \"{humanized}\"\n\n"
+                f'Original: "{original}"\n'
+                f'Your Rewrite: "{humanized}"\n\n'
                 f"Task: Adjust your rewrite so it matches EXACTLY {orig_count} words (tolerance +/- 2). "
                 f"Maintain elite academic cadence and precise terminology. "
                 f"CRITICAL: Do not omit any facts, figures, or named entities from the original. "
@@ -1180,7 +1178,7 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 temperature=0.1,
                 max_tokens=200,
             )
-            corrected = resp.choices[0].message.content.strip().strip(""'")
+            corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
             if abs(orig_count - count_words(corrected)) <= 3:
                 return corrected
             humanized  = corrected
