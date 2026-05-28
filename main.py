@@ -76,7 +76,6 @@ TRANSITIONAL_OPENERS = {
     "notwithstanding", "accordingly"
 }
 
-# AI tell phrases — banned as mechanical crutches, not as legitimate technical terms
 AI_TELL_PHRASES = {
     "delve", "testament", "pivotal", "underscore", "shed light on", "navigate",
     "landscape", "tapestry", "beacon", "robust", "holistic", "paradigm", "synergy",
@@ -97,7 +96,6 @@ AI_TELL_PHRASES = {
     "groundbreaking", "state-of-the-art", "cutting-edge", "revolutionary",
     "transformative", "unprecedented", "foster", "seamlessly", "streamline",
     "optimize", "enhance", "demystify",
-    # Phrase-level tells
     "operating continuously without conscious oversight", "this structure",
     "that structure", "the present", "the indicated", "the respective",
 }
@@ -551,56 +549,46 @@ def is_markdown_list(text: str) -> bool:
 
 
 # ===== SCORING =====
-# Lower score = more human. Score penalizes AI patterns and rewards natural variation.
 
 def score_sentence(sent: str) -> float:
     s = sent.lower()
     words = sent.split()
     score = 0
 
-    # Penalize AI tell phrases heavily
     for tell in AI_TELL_PHRASES:
         if tell in s:
             score += 20
 
-    # Penalize the "sweet spot" length that AI loves (15-22 words, every sentence)
     if 15 <= len(words) <= 22:
         score += 8
 
-    # Penalize formulaic transitional openers
     if words:
         first = words[0].lower().strip(",.!?;:")
         if first in TRANSITIONAL_OPENERS:
             score += 15
 
-    # Penalize low lexical diversity
     if len(words) > 5:
         unique_ratio = len({w.lower() for w in words}) / len(words)
         if unique_ratio < 0.5:
             score += 12
 
-    # Penalize over-punctuated sentences (AI stacking clauses)
     if sent.count(",") > 3 or sent.count(";") > 2:
         score += 12
 
     if "operating continuously" in s:
         score += 25
 
-    # Penalize very short sentences that are not headings/lists (likely truncation artifacts)
     if len(words) < 4 and not (sent.startswith("#") or sent.startswith("*")):
         score += 15
 
-    # Penalize sentences that are all passive + abstract noun combos
     passive_markers = ["is", "are", "was", "were", "be", "been", "being"]
     passive_count = sum(1 for w in words if w.lower() in passive_markers)
     if passive_count > 3 and len(words) < 18:
         score += 8
 
-    # Reward natural sentence-ending variety (questions, dashes, etc.)
     if sent.endswith("?") or "—" in sent:
         score = max(0, score - 10)
 
-    # Reward use of "we" / "our" (human authorial voice)
     if " we " in s or s.startswith("we ") or " our " in s:
         score = max(0, score - 8)
 
@@ -611,274 +599,87 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
-# ===== GRAMMATICAL COMPLETENESS HELPERS =====
+# ===== LENGTH ENFORCEMENT (ported from working version) =====
 
-_CLAUSE_BOUNDARY_WORDS = {
-    "and", "but", "or", "nor", "for", "yet", "so",
-    "which", "where", "when", "while", "although", "because", "since", "if", "unless",
-    "whereas", "despite", "although", "though", "even", "provided",
-}
-
-_COMMON_VERBS = {
-    "is", "are", "was", "were", "be", "been", "being",
-    "has", "have", "had", "do", "does", "did", "done",
-    "shows", "show", "demonstrates", "demonstrate", "indicates", "indicate",
-    "reveals", "reveal", "suggests", "suggest", "implies", "imply",
-    "confirms", "confirm", "establishes", "establish", "proves", "prove",
-    "argues", "argue", "contends", "contend", "posits", "posit",
-    "controls", "control", "governs", "govern", "modulates", "modulate",
-    "regulates", "regulate", "mediates", "mediate", "coordinates", "coordinate",
-    "produces", "produce", "generates", "generate", "induces", "induce",
-    "effects", "effect", "drives", "drive", "underpins", "underpin",
-    "influences", "influence", "shapes", "shape", "determines", "determine",
-    "constrains", "constrain", "processes", "process", "computes", "compute",
-    "executes", "execute", "evaluates", "evaluate", "transforms", "transform",
-    "yields", "yield", "sustains", "sustain", "captures", "capture",
-    "reflects", "reflect", "points", "point", "manifests", "manifest",
-    "evidences", "evidence", "derives", "derive", "obtains", "obtain",
-    "acquires", "acquire", "maintains", "maintain", "preserves", "preserve",
-    "retains", "retain", "requires", "require", "necessitates", "necessitate",
-    "provides", "provide", "furnishes", "furnish", "confers", "confer",
-    "increases", "increase", "decreases", "decrease", "augment", "augments",
-    "diminish", "diminishes", "escalate", "escalates", "decline", "declines",
-    "attenuate", "attenuates", "examine", "examines", "investigate", "investigates",
-    "ascertain", "ascertains", "elucidate", "elucidates", "commence", "commences",
-    "initiate", "initiates", "terminate", "terminates", "conclude", "concludes",
-    "cease", "ceases", "promote", "promotes", "enable", "enables", "advance",
-    "advances", "further", "furthers", "bolster", "bolsters",
-}
-
-_COMMON_NOUNS = {
-    "the", "a", "an", "this", "that", "these", "those", "our", "we",
-    "it", "its", "they", "their", "them", "he", "she", "his", "her",
-    "data", "results", "findings", "analysis", "model", "study", "research",
-    "system", "process", "mechanism", "framework", "structure", "method",
-    "approach", "theory", "hypothesis", "conclusion", "evidence", "argument",
-    "author", "patient", "subject", "participant", "sample", "population",
-    "cell", "neuron", "gene", "protein", "enzyme", "organ", "tissue",
-    "algorithm", "network", "function", "parameter", "variable", "factor",
-    "element", "component", "dimension", "aspect", "institution", "policy",
-    "context", "principle", "outcome", "finding", "result", "effect",
-}
-
-
-def _looks_like_verb(word: str) -> bool:
-    w = word.lower().strip(",.!?;:")
-    if w in _COMMON_VERBS:
-        return True
-    if w.endswith(("ed", "es", "ing", "ize", "ise", "ify", "ate")):
-        return True
-    return False
-
-
-def _looks_like_noun(word: str) -> bool:
-    w = word.lower().strip(",.!?;:")
-    if w in _COMMON_NOUNS:
-        return True
-    if w.endswith(("tion", "sion", "ment", "ness", "ity", "ure", "age", "ance", "ence", "dom")):
-        return True
-    return False
-
-
-def is_grammatically_complete(sentence: str) -> bool:
-    """Lightweight heuristic: sentence must contain at least one likely noun/pronoun
-    and one likely verb to count as a complete declarative clause."""
-    words = sentence.split()
-    if len(words) < 3:
-        return False
-    has_noun = any(_looks_like_noun(w) for w in words)
-    has_verb = any(_looks_like_verb(w) for w in words)
-    return has_noun and has_verb
-
-
-def smart_truncate(sentence: str, target: int) -> str:
-    """Truncate at the nearest clause boundary before target, ensuring completeness."""
-    words = sentence.split()
-    if len(words) <= target:
-        return sentence
-
-    best_cut = -1
-    # Scan backwards from target to find a safe boundary
-    for i in range(min(target, len(words) - 1), 2, -1):
-        w = words[i].lower().strip(",.!?;:")
-        prev = words[i - 1]
-
-        # Coordinating conjunction preceded by comma
-        if w in ("and", "but", "or", "nor", "for", "yet", "so"):
-            if prev.endswith(",") or prev.endswith(";"):
-                best_cut = i - 1  # cut before the conjunction clause
-                break
-
-        # Subordinating conjunctions / relative pronouns
-        if w in ("which", "where", "when", "while", "although", "because", "since", "if", "unless", "whereas", "though"):
-            if i > 0:
-                best_cut = i
-                break
-
-        # Semicolon boundary
-        if ";" in prev:
-            best_cut = i
-            break
-
-    if best_cut > 2:
-        truncated = " ".join(words[:best_cut]).rstrip(",;—")
-        if is_grammatically_complete(truncated):
-            return truncated + "."
-
-    # Fallback: if we cannot truncate gracefully, return original rather than fragment
-    return sentence
-
-
-# ===== FILLER GATE =====
-
-def _sentence_needs_filler(sentence: str, original: str) -> bool:
-    hum_count  = count_words(sentence)
+def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) -> str:
+    """Ensure humanized text stays within word count bounds of original."""
     orig_count = count_words(original)
-    shortfall  = orig_count - hum_count
-    already_extended = sentence.rstrip(".!?").endswith(")")
-    is_stub          = hum_count < 7
-    big_shortfall    = shortfall > 5
-    return is_stub and big_shortfall and not already_extended
-
-
-# ===== LENGTH ENFORCEMENT =====
-
-def enforce_length_constraint(original: str, humanized: str, max_diff: int = 3) -> str:
-    orig_count = count_words(original)
-    hum_count  = count_words(humanized)
+    hum_count = count_words(humanized)
 
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
 
     if hum_count > orig_count + max_diff:
-        words  = humanized.split()
-        keep   = max(orig_count + max_diff - 1, min(orig_count, len(words)))
-        # Use smart_truncate instead of naive slicing
-        candidate = smart_truncate(humanized, keep)
-        if count_words(candidate) <= orig_count + max_diff and is_grammatically_complete(candidate):
-            return candidate
-        # If smart truncate fails, try naive but ensure completeness
-        naive = " ".join(words[:keep]).rstrip(",;—")
-        if is_grammatically_complete(naive):
-            return naive if naive[-1] in ".!?" else naive + "."
-        # If still incomplete, return original humanized (accept length violation over fragment)
-        return humanized
+        words = humanized.split()
+        keep = max(orig_count + max_diff - 1, 5)
+        trimmed = " ".join(words[:keep])
+        if trimmed[-1] in ',;—':
+            trimmed = trimmed[:-1]
+        if trimmed[-1] not in '.!?':
+            trimmed += '.'
+        return trimmed
 
-    if _sentence_needs_filler(humanized, original):
-        humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized) + "."
+    if hum_count < orig_count - max_diff:
+        humanized = humanized.rstrip('.') + ' ' + get_filler_phrase(humanized) + '.'
 
     return humanized
 
 
-def validate_and_correct_length(original: str, humanized: str, max_diff: int = 3) -> str:
-    if abs(count_words(original) - count_words(humanized)) <= max_diff:
-        return humanized
-    return enforce_length_constraint(original, humanized, max_diff)
+# ===== OBFUSCATION LAYER (ported from working version) =====
 
-
-# ===== GRAMMAR-SAFE PARENTHETICAL INSERTION =====
-
-def _insert_parenthetical_after_noun(sent: str, noun: str, parenthetical: str) -> str:
-    pattern = re.compile(
-        r"(\b" + re.escape(noun) + r"\b)([,\.;:!?]?)",
-        re.IGNORECASE
-    )
-    def replacer(m):
-        word, punct = m.group(1), m.group(2)
-        if punct:
-            return f"{word} {parenthetical}{punct}"
-        return f"{word} {parenthetical}"
-    return pattern.sub(replacer, sent, count=1)
-
-
-def _prepend_signpost(sent: str, opener: str) -> str:
-    sent = sent.strip()
-    if not sent:
-        return sent
-    opener = opener.strip()
-    if opener.endswith(","):
-        first_char = sent[0]
-        rest = sent[1:]
-        sent_body = first_char.lower() + rest
-    else:
-        sent_body = sent
-    return f"{opener} {sent_body}"
-
-
-# ===== OBFUSCATION LAYER =====
-
-MODIFICATION_RATE = 0.28
-
-def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_RATE) -> str:
+def final_obfuscation_layer(text: str) -> str:
+    """Apply subtle linguistic variations. No technique overused."""
     sentences = split_sentences(text)
     processed = []
 
     for i, sent in enumerate(sentences):
         words = sent.split()
-        if not words or len(words) < 6:
-            processed.append(sent)
+        if not words:
             continue
 
-        if random.random() > modification_rate:
-            processed.append(sent)
-            continue
-
-        technique = random.randint(0, 4)
-
-        if technique == 0 and len(words) > 10:
-            if "," in sent and len(words) > 12:
-                parts = sent.split(",", 1)
-                left_words  = parts[0].split()
-                right_words = parts[1].split()
-                if len(left_words) >= 5 and len(right_words) >= 5:
-                    sent = parts[0] + "; " + parts[1].strip()
-
-        elif technique == 1 and len(words) > 8:
-            for word in words:
-                clean = word.lower().strip(",.!?;:")
-                if clean in ANCHOR_NOUNS:
-                    sent = _insert_parenthetical_after_noun(
-                        sent, clean, get_hedging_parenthetical()
-                    )
-                    break
-
-        elif technique == 2 and len(words) > 12:
-            break_words = {"which", "where", "when", "while", "although"}
+        # Only apply to ~30% of sentences, rotate techniques
+        if i % 3 == 0 and len(words) > 8:
+            swaps = {
+                "the": ["this", "that"],
+                "is": ["remains", "constitutes"],
+                "are": ["constitute", "represent"],
+                "and": ["while", "yet"],
+                "to": ["toward"],
+                "of": ["within"],
+                "in": ["amid"],
+                "for": ["regarding"],
+                "with": ["via"],
+                "by": ["through"],
+                "from": ["originating in"],
+                "as": ["functioning as"],
+            }
+            swap_count = 0
             for idx, word in enumerate(words):
-                if word.lower() in break_words and 3 < idx < len(words) - 4:
-                    fragment  = " ".join(words[:idx]).rstrip(",") + ". "
-                    remainder = " ".join(words[idx:])
-                    remainder = remainder[0].upper() + remainder[1:]
-                    sent = fragment + remainder
-                    break
+                clean = word.lower().strip(",.!?;:")
+                if clean in swaps and swap_count < 1:
+                    new_word = random.choice(swaps[clean])
+                    if word[0].isupper():
+                        new_word = new_word.capitalize()
+                    if word[-1] in ",.!?;:":
+                        new_word += word[-1]
+                    words[idx] = new_word
+                    swap_count += 1
+            sent = " ".join(words)
 
-        elif technique == 3 and len(words) > 10:
-            if " and " in sent:
-                and_pos = sent.find(" and ")
-                before  = sent[:and_pos].strip()
-                after   = sent[and_pos + 5:].strip()
-                clause_verbs = {
-                    "is", "are", "was", "were", "has", "have",
-                    "controls", "regulates", "modulates", "governs"
-                }
-                if (len(before.split()) > 4 and len(after.split()) > 4
-                        and any(v in before.lower().split() for v in clause_verbs)):
-                    sent = sent.replace(" and ", ", consequently, ", 1)
+        elif i % 3 == 1 and len(words) > 12:
+            if "," in sent:
+                parts = sent.split(",", 1)
+                sent = parts[0] + "; " + parts[1]
 
-        elif technique == 4 and len(words) > 8:
-            passive_pattern = re.compile(
-                r"\b(is|are|was|were)\s+(\w+ed)\s+by\s+", re.IGNORECASE
-            )
-            if passive_pattern.search(sent):
-                for tell in ["It is important to note that ", "It should be noted that ",
-                             "It is worth noting that ", "It is evident that "]:
-                    if sent.startswith(tell):
-                        sent = sent[len(tell)].upper() + sent[len(tell)+1:]
-                        break
+        elif i % 3 == 2 and len(words) > 10:
+            insert_point = min(3, len(words) - 2)
+            words.insert(insert_point, "(notably)")
+            sent = " ".join(words)
 
-        sent = re.sub(r"\s+", " ", sent).strip()
-        if sent and sent[-1] not in ".!?":
-            sent += "."
+        sent = re.sub(r'\s+', ' ', sent).strip()
+        if sent and sent[-1] not in '.!?':
+            sent += '.'
+
         processed.append(sent)
 
     return " ".join(processed)
@@ -910,30 +711,29 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
     return " ".join(processed)
 
 
-# ===== REPETITION ELIMINATION =====
+# ===== REPETITION ELIMINATION (ported from working version) =====
 
 def eliminate_repetition(text: str) -> str:
+    """Reduce conceptual repetition within paragraphs using n-gram overlap."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
 
-    processed    = []
-    used_bigrams: set = set()
+    processed = []
+    used_bigrams = set()
 
-    for idx, sent in enumerate(sentences):
-        words   = sent.lower().split()
-        bigrams = {
-            words[i].strip(",.!?;:") + " " + words[i + 1].strip(",.!?;:")
-            for i in range(len(words) - 1)
-        }
-        overlap_ratio = len(bigrams & used_bigrams) / len(bigrams) if bigrams else 0
+    for sent in sentences:
+        words = sent.lower().split()
+        bigrams = set()
+        for i in range(len(words) - 1):
+            bg = words[i].strip(",.!?;:") + " " + words[i+1].strip(",.!?;:")
+            bigrams.add(bg)
+
+        overlap = len(bigrams & used_bigrams)
+        overlap_ratio = overlap / len(bigrams) if bigrams else 0
 
         if overlap_ratio > 0.3 and len(words) > 6:
-            # Instead of blindly chopping to 5 words, smart-truncate to a complete clause
-            candidate = smart_truncate(sent, 5)
-            if candidate != sent and is_grammatically_complete(candidate):
-                sent = candidate
-            # If we can't make a complete short version, just leave it
+            sent = ' '.join(words[:5]) + "."
 
         used_bigrams.update(bigrams)
         if len(processed) > 0 and len(processed) % 5 == 0:
@@ -944,10 +744,10 @@ def eliminate_repetition(text: str) -> str:
     return " ".join(processed)
 
 
-# ===== BURSTINESS ENGINE =====
-# Now uses smart_truncate and never produces incomplete fragments
+# ===== BURSTINESS ENGINE (ported from working version) =====
 
 def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
+    """Apply length variation patterns. No em-dashes."""
     if not sentences:
         return sentences
 
@@ -955,63 +755,62 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
     result = []
 
     for i, sent in enumerate(sentences):
-        words       = sent.split()
+        words = sent.split()
         current_len = len(words)
-        cycle = i % 5
 
-        if cycle == 0:
-            if current_len > 38:
-                target = max(28, int(current_len * 0.80))
-                sent = smart_truncate(sent, target)
+        if i % 5 == 0:
+            # LONG: expand with embedded clause
+            target = int(current_len * 1.3)
+            if len(words) < target:
+                expansions = [
+                    " through integrated feedback loops.",
+                    " via polysynaptic pathways.",
+                    " under homeostatic regulation.",
+                    " through descending cortical input.",
+                ]
+                sent = sent.rstrip('.') + random.choice(expansions)
 
-        elif cycle == 1:
-            if current_len > 9:
-                target = random.randint(4, 9)
-                candidate = smart_truncate(sent, target)
-                if candidate != sent:
-                    sent = candidate
-                # If smart_truncate refuses (no complete clause possible), leave original
+        elif i % 5 == 1:
+            # SHORT: compress
+            target = max(int(current_len * 0.6), 4)
+            if len(words) > target:
+                sent = ' '.join(words[:target]) + '.'
 
-        elif cycle == 2:
-            if current_len > 20:
-                target = random.randint(11, 20)
-                candidate = smart_truncate(sent, target)
-                if candidate != sent:
-                    sent = candidate
+        elif i % 5 == 2:
+            # MEDIUM with semicolon
+            if ';' not in sent and len(words) > 10:
+                mid = len(words) // 2
+                sent = ' '.join(words[:mid]) + '; ' + ' '.join(words[mid:])
 
-        elif cycle == 3:
-            if current_len > 6:
-                target = random.randint(3, 6)
-                candidate = smart_truncate(sent, target)
-                if candidate != sent:
-                    sent = candidate
+        elif i % 5 == 3:
+            # SHORT fragment
+            if len(words) > 7:
+                sent = ' '.join(words[:4]) + '.'
 
-        elif cycle == 4:
-            if current_len > 35:
-                target = max(25, int(current_len * 0.75))
-                sent = smart_truncate(sent, target)
-            elif current_len > 28 and ";" not in sent:
-                mid = current_len // 2
-                sent = " ".join(words[:mid]) + "; " + " ".join(words[mid:])
+        elif i % 5 == 4:
+            # LONG with parenthetical
+            if len(words) < 18:
+                parentheticals = [
+                    " (a requirement that cannot be bypassed).",
+                    " (this occurs involuntarily).",
+                    " (under normal physiological conditions).",
+                    " (a process essential for survival).",
+                ]
+                sent = sent.rstrip('.') + random.choice(parentheticals)
 
-        sent = re.sub(r"\s+", " ", sent).strip()
-        if sent and sent[-1] not in ".!?":
-            sent += "."
+        sent = re.sub(r'\s+', ' ', sent).strip()
+        if sent and sent[-1] not in '.!?':
+            sent += '.'
         result.append(sent)
 
-    # Keep total word count drift within 10%
+    # Verify total word count
     new_total = sum(count_words(s) for s in result)
     if abs(new_total - total_words) > int(total_words * 0.1):
         diff = new_total - total_words
         if diff > 0:
             longest_idx = max(range(len(result)), key=lambda i: count_words(result[i]))
-            w = result[longest_idx].split()
-            candidate = smart_truncate(result[longest_idx], max(len(w) - diff, 5))
-            if candidate != result[longest_idx]:
-                result[longest_idx] = candidate
-            else:
-                # If can't truncate gracefully, just trim the end words and hope
-                result[longest_idx] = " ".join(w[:max(len(w) - diff, 5)]) + "."
+            words = result[longest_idx].split()
+            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 3)]) + '.'
 
     return result
 
@@ -1106,81 +905,41 @@ _JOURNAL_COMPILED = {
 
 
 def upgrade_journal_register(text: str) -> str:
-    """Upgrade common words to formal journal-standard equivalents."""
     for pattern, choices in _JOURNAL_COMPILED.items():
         text = pattern.sub(lambda m, c=choices: random.choice(c), text)
     return text
 
 
-# ===== LOCAL FALLBACK =====
+# ===== LOCAL FALLBACK (ported from working version) =====
 
-_WORD_REPLACEMENTS = {
-    r"\bimportant\b":        ["key", "critical", "main", "essential", "central", "primary"],
-    r"\bplays a critical role\b": ["is essential", "is vital", "serves as", "underpins"],
-    r"\bplays a vital role\b":    ["is essential", "is critical", "serves as", "anchors"],
-    r"\bis located\b":       ["lies", "sits", "is found", "is situated", "resides"],
-    r"\bis composed of\b":   ["contains", "has", "includes", "comprises", "incorporates"],
-    r"\bacts as\b":          ["works as", "functions as", "serves as", "operates as"],
-    r"\bdue to\b":           ["because of", "owing to", "as a result of", "stemming from"],
-    r"\boverall\b":          ["in sum", "taken together", "collectively", "broadly"],
-    r"\badditionally\b":     ["also", "plus", "further", "as well"],
-    r"\bhowever\b":          ["yet", "though", "although", "nevertheless", "even so"],
-    r"\btherefore\b":        ["thus", "hence", "so", "accordingly", "as such"],
-    r"\bconsequently\b":     ["as a result", "thereby", "accordingly", "hence"],
-    r"\bregulates\b":        ["controls", "governs", "modulates", "directs", "coordinates"],
-    r"\bcontains\b":         ["holds", "possesses", "encompasses", "incorporates", "houses"],
-    r"\bresponsible for\b":  ["accountable for", "charged with", "tasked with", "integral to"],
-    r"\bassociated with\b":  ["linked to", "tied to", "connected with", "related to", "coupled with"],
-    r"\binvolved in\b":      ["engaged in", "participating in", "contributing to", "implicated in"],
-    r"\bconsists of\b":      ["comprises", "is made up of", "incorporates", "encompasses"],
-    r"\bpart of\b":          ["component of", "element of", "constituent of", "segment of"],
-    r"\bfunction\b":         ["role", "purpose", "operation", "activity", "capacity"],
-    r"\bstructure\b":        ["anatomy", "architecture", "framework", "morphology", "configuration"],
-    r"\bprocess\b":          ["mechanism", "procedure", "pathway", "sequence", "cascade"],
-    r"\bcontrol\b":          ["regulation", "management", "oversight", "direction", "governance"],
-    r"\bphenomenon\b":       ["occurrence", "event", "manifestation", "observation", "finding"],
-    r"\bframework\b":        ["schema", "construct", "paradigm", "architecture", "scaffold"],
-    r"\butilize\b":          ["use", "apply", "employ", "draw on"],
-    r"\bfacilitate\b":       ["support", "enable", "allow", "help drive"],
-    r"\bdemonstrate\b":      ["show", "reveal", "indicate", "confirm"],
-    r"\bimplement\b":        ["apply", "adopt", "put in place", "carry out"],
-    r"\bhighlight\b":        ["show", "reveal", "point to", "make clear"],
-    r"\bexhibit\b":          ["show", "display", "present", "express"],
-    r"\baddress\b":          ["tackle", "examine", "treat", "handle"],
-    r"\bcomprehensive\b":    ["thorough", "detailed", "full", "broad"],
-    r"\bsignificant\b":      ["notable", "marked", "substantial", "considerable"],
-    r"\bnovel\b":            ["new", "original", "distinct", "previously unreported"],
-    r"\bdemystify\b":        ["clarify", "explain", "unpack", "make plain"],
-    r"\bsimultaneously\b":   ["at the same time", "together", "concurrently", "in parallel"],
-}
-
-_COMPILED_REPLACEMENTS = {
-    re.compile(pat, re.IGNORECASE): choices
-    for pat, choices in _WORD_REPLACEMENTS.items()
-}
-
-def local_humanize(sent: str, index: int) -> str:
+def local_humanize(sent: str, index: int = 0) -> str:
+    """Fallback humanization when Mistral fails."""
     words = sent.split()
-    if not words:
-        return sent
+
+    replacements = {
+        r'\bimportant\b': random.choice(['key', 'critical', 'main']),
+        r'\bplays a critical role\b': random.choice(['is essential', 'is vital', 'serves as']),
+        r'\bplays a vital role\b': random.choice(['is essential', 'is critical', 'serves as']),
+        r'\bis located\b': random.choice(['lies', 'sits', 'is found']),
+        r'\bis composed of\b': random.choice(['contains', 'has', 'includes']),
+        r'\bacts as\b': random.choice(['works as', 'functions as', 'serves as']),
+        r'\bdue to\b': random.choice(['because of', 'owing to', 'as a result of']),
+        r'\boverall\b': random.choice(['in sum', 'taken together', 'collectively']),
+        r'\badditionally\b': random.choice(['also', 'plus', 'further']),
+        r'\bhowever\b': random.choice(['yet', 'though', 'although']),
+        r'\btherefore\b': random.choice(['thus', 'hence', 'so']),
+        r'\bconsequently\b': random.choice(['as a result', 'thereby', 'accordingly']),
+    }
 
     h = sent
-    for pattern, choices in _COMPILED_REPLACEMENTS.items():
-        h = pattern.sub(lambda m, c=choices: random.choice(c), h)
+    for pattern, replacement in replacements.items():
+        h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
 
-    # Apply journal register upgrade
-    h = upgrade_journal_register(h)
-
-    if index % 3 == 0 and len(words) > 8:
-        candidate = smart_truncate(h, 6)
-        if candidate != h and is_grammatically_complete(candidate):
-            h = candidate
-    elif index % 3 == 2 and "," in h:
-        h = h.replace(",", ";", 1)
-
-    if (index % 7 == 0 and len(words) > 5
-            and not is_markdown_heading(h) and not is_markdown_list(h)):
-        h = _prepend_signpost(h, get_signpost_opener())
+    # Vary sentence starters
+    if index % 4 == 0 and not h.startswith('But') and not h.startswith('#') and not h.startswith('*'):
+        h = 'But ' + h[0].lower() + h[1:]
+    elif index % 4 == 2 and not h.startswith('Yet') and not h.startswith('#') and not h.startswith('*'):
+        h = 'Yet ' + h[0].lower() + h[1:]
 
     return h
 
@@ -1214,7 +973,6 @@ def inject_investigator_voice(text: str) -> str:
 
 
 # ===== SYSTEM PROMPT =====
-# Merged master prompt with formal journal register emphasis
 
 SYSTEM = """You are a senior academic editor and active investigator with 30 years of publishing experience across STEM, social sciences, humanities, law, business, and education. Your sole task is to rewrite AI-generated academic text so that it reads like the work of a leading human researcher — engaging, precise, idiosyncratic, and free of AI detection markers — while preserving every data point, citation, and technical claim in the original.
 
@@ -1305,7 +1063,7 @@ Human academic writing alternates high-density technical vocabulary with accessi
 
 - Avoid inserting unrelated academic phrases into scientific explanations. Every sentence should progress logically from the previous one without abrupt interruptions or artificial complexity.
 - Reduce forced formality. Use direct academic language instead of overcomplicated expressions that do not improve meaning or clarity.
-- Prioritize clarity over complexity. Simpler wording with accurate meaning often appears more authentic than highly compressed technical language.
+- Prioritize clarity over complexity. Simpler wording with accurate meaning often appears more authentic than heavily compressed technical language.
 - Maintain semantic consistency. Scientific writing should remain scientific. Avoid mixing analytical, philosophical, or abstract rhetoric into straightforward explanatory content.
 - Readable academic writing is usually perceived as more human than heavily compressed or excessively intellectualized text.
 
@@ -1396,7 +1154,7 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 max_tokens=200,
             )
             corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
-            if abs(orig_count - count_words(corrected)) <= 3 and is_grammatically_complete(corrected):
+            if abs(orig_count - count_words(corrected)) <= 3:
                 return corrected
             humanized  = corrected
             hum_count  = count_words(humanized)
@@ -1497,7 +1255,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
             orig = sent.get("original", "")
             h    = sent.get("humanized", "") or local_humanize(orig, j)
             h    = correction_loop(orig, h)
-            h    = validate_and_correct_length(orig, h, max_diff=3)
+            h    = enforce_length_constraint(orig, h, max_diff=3)
             para_sentences.append({
                 "orig":     orig,
                 "hum":      h,
@@ -1508,24 +1266,24 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
         burst_sentences = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burst_sentences)):
-            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
-            h = apply_signpost_openers(h)
+            h = enforce_length_constraint(sent_data["orig"], h, max_diff=4)
             h = final_obfuscation_layer(h)
             h = eliminate_repetition(h)
+            h = apply_signpost_openers(h)
             h = inject_investigator_voice(h)
-            h = upgrade_journal_register(h)  # Ensure journal register
-            h = validate_and_correct_length(sent_data["orig"], h, max_diff=3)
+            h = upgrade_journal_register(h)
+            h = enforce_length_constraint(sent_data["orig"], h, max_diff=5)
             score = score_sentence(h)
 
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 alt = alt or local_humanize(sent_data["orig"], idx + 100)
                 alt = correction_loop(sent_data["orig"], alt)
-                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
+                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=3)
                 alt = final_obfuscation_layer(alt)
                 alt = eliminate_repetition(alt)
                 alt = upgrade_journal_register(alt)
-                alt = validate_and_correct_length(sent_data["orig"], alt, max_diff=3)
+                alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
                 alt = re.sub(r"\s+", " ", alt).strip()
                 if alt and alt[-1] not in ".!?":
                     alt += "."
@@ -1544,7 +1302,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
             seed = 200
             while len(unique_alts) < 3:
                 fallback = local_humanize(sent_data["orig"], seed)
-                fallback = validate_and_correct_length(sent_data["orig"], fallback, max_diff=3)
+                fallback = enforce_length_constraint(sent_data["orig"], fallback, max_diff=3)
                 fl = fallback.lower().strip()
                 if fl != orig_lower and fl not in seen_lowers:
                     unique_alts.append(fallback)
