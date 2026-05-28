@@ -64,11 +64,10 @@ ANCHOR_NOUNS = {
     "arteries", "pyramids", "olives", "structure", "organ", "system", "pathway",
     "mechanism", "framework", "apparatus", "substrate", "topology", "interface",
     "nucleus", "ganglion", "plexus", "fasciculus", "lamina", "sulcus", "gyrus",
-    # extended for non-bio domains
     "model", "theory", "argument", "concept", "process", "method", "approach",
     "variable", "factor", "element", "component", "dimension", "aspect",
-    "institution", "policy", "context", "framework", "paradigm", "principle",
-    "evidence", "data", "analysis", "result", "finding", "outcome",
+    "institution", "policy", "context", "principle", "evidence", "data",
+    "analysis", "result", "finding", "outcome",
 }
 
 TRANSITIONAL_OPENERS = {
@@ -188,6 +187,7 @@ SIGNPOST_OPENERS: list = [
 
 # ---------------------------------------------------------------------------
 # Domain-specific filler phrase banks
+# (used ONLY as a last resort for genuine stubs — see _sentence_needs_filler)
 # ---------------------------------------------------------------------------
 
 _BIO_FILLERS: list = [
@@ -212,20 +212,6 @@ _BIO_FILLERS: list = [
     "within genetically encoded regulatory networks",
     "via post-translational protein modification",
 ]
-_BIO_EXPANSION: list = [
-    "(under normal physiological conditions)",
-    "(a process essential for survival)",
-    "(mediated by descending corticospinal tracts)",
-    "(regulated through negative feedback mechanisms)",
-    "(consistent with established neuroanatomical models)",
-    "(dependent on intact afferent-efferent circuitry)",
-    "(this occurs involuntarily)",
-    "(a requirement that cannot be bypassed)",
-    "(via receptor-ligand binding interactions)",
-    "(under hormonal regulatory influence)",
-    "(governed by enzymatic cascade reactions)",
-    "(contingent on cellular membrane integrity)",
-]
 
 _TECH_FILLERS: list = [
     "within tightly constrained computational parameters",
@@ -248,18 +234,6 @@ _TECH_FILLERS: list = [
     "through modular system decomposition",
     "under worst-case asymptotic bounds",
     "via deterministic finite-state transitions",
-]
-_TECH_EXPANSION: list = [
-    "(within computational complexity bounds)",
-    "(subject to hardware resource constraints)",
-    "(under controlled benchmark conditions)",
-    "(consistent with formal specification requirements)",
-    "(assuming deterministic input conditions)",
-    "(validated against held-out test data)",
-    "(per established algorithmic conventions)",
-    "(across multiple independent test runs)",
-    "(subject to convergence guarantees)",
-    "(as established in prior literature)",
 ]
 
 _HUMANITIES_FILLERS: list = [
@@ -284,18 +258,6 @@ _HUMANITIES_FILLERS: list = [
     "via ideological critique and deconstruction",
     "within dominant and subaltern discourses",
 ]
-_HUMANITIES_EXPANSION: list = [
-    "(as the scholarly literature attests)",
-    "(subject to interpretive contestation)",
-    "(a point widely acknowledged in the field)",
-    "(within its specific historical moment)",
-    "(consistent with the theoretical tradition)",
-    "(as subsequent historiography has confirmed)",
-    "(a claim that warrants careful qualification)",
-    "(a position not without its critics)",
-    "(in the context of the broader debate)",
-    "(as the primary sources make clear)",
-]
 
 _SOCIAL_FILLERS: list = [
     "through established socio-institutional mechanisms",
@@ -318,18 +280,6 @@ _SOCIAL_FILLERS: list = [
     "within bounded rationality frameworks",
     "through stratified sampling methodological designs",
     "across longitudinal observational time points",
-]
-_SOCIAL_EXPANSION: list = [
-    "(as demonstrated in empirical studies)",
-    "(consistent with the existing evidence base)",
-    "(subject to individual-level variation)",
-    "(a finding replicated across multiple contexts)",
-    "(as the regression analysis confirms)",
-    "(under conditions of ecological validity)",
-    "(holding other variables constant)",
-    "(as theory would predict)",
-    "(across demographically diverse samples)",
-    "(contingent on measurement reliability)",
 ]
 
 _NATURAL_FILLERS: list = [
@@ -354,18 +304,6 @@ _NATURAL_FILLERS: list = [
     "within geologically constrained timescales",
     "through oxidation-reduction reaction cycles",
 ]
-_NATURAL_EXPANSION: list = [
-    "(under controlled laboratory conditions)",
-    "(consistent with thermodynamic principles)",
-    "(as field observations confirm)",
-    "(subject to ambient temperature effects)",
-    "(across experimentally replicated trials)",
-    "(within measurable detection thresholds)",
-    "(as spectrometric analysis verifies)",
-    "(under isothermal equilibrium conditions)",
-    "(consistent with conservation of mass)",
-    "(as validated by independent replication)",
-]
 
 _EDUCATION_FILLERS: list = [
     "through scaffolded instructional sequences",
@@ -379,13 +317,6 @@ _EDUCATION_FILLERS: list = [
     "across culturally responsive curriculum frameworks",
     "via deliberate practice and spaced repetition",
 ]
-_EDUCATION_EXPANSION: list = [
-    "(as evidence-based pedagogy prescribes)",
-    "(consistent with constructivist learning theory)",
-    "(across diverse learner populations)",
-    "(subject to instructional design constraints)",
-    "(as classroom observation data confirms)",
-]
 
 _LAW_FILLERS: list = [
     "within applicable statutory and regulatory frameworks",
@@ -398,13 +329,6 @@ _LAW_FILLERS: list = [
     "via proportionality and balancing tests",
     "within legislatively defined normative boundaries",
     "through equitable remedial discretion",
-]
-_LAW_EXPANSION: list = [
-    "(as established by binding precedent)",
-    "(subject to legislative amendment)",
-    "(within the bounds of constitutional authority)",
-    "(per the court's interpretive holding)",
-    "(consistent with the rule of law)",
 ]
 
 _BUSINESS_FILLERS: list = [
@@ -424,18 +348,7 @@ _BUSINESS_FILLERS: list = [
     "via financial instrument pricing models",
     "within regulatory compliance frameworks",
 ]
-_BUSINESS_EXPANSION: list = [
-    "(as market data consistently shows)",
-    "(subject to regulatory oversight)",
-    "(under ceteris paribus conditions)",
-    "(consistent with efficient market theory)",
-    "(across multiple fiscal reporting periods)",
-    "(as financial modeling confirms)",
-    "(contingent on investor risk tolerance)",
-    "(within accepted accounting standards)",
-]
 
-# Universal fallback — field-neutral, safe for any sentence
 _UNIVERSAL_FILLERS: list = [
     "through inherently integrated processes",
     "within clearly defined boundaries",
@@ -482,28 +395,6 @@ _UNIVERSAL_FILLERS: list = [
     "under conditions widely recognized in the field",
     "across both theoretical and applied dimensions",
     "through a principled sequence of analytical steps",
-]
-_UNIVERSAL_EXPANSION: list = [
-    "(as the evidence consistently indicates)",
-    "(a point well-established in the literature)",
-    "(subject to methodological qualification)",
-    "(under conditions of rigorous scrutiny)",
-    "(as subsequent analysis confirms)",
-    "(a finding robust across contexts)",
-    "(in ways that merit further investigation)",
-    "(consistent with prior theoretical accounts)",
-    "(under the assumptions stated above)",
-    "(an observation not without precedent)",
-    "(as the broader literature attests)",
-    "(subject to the caveats noted above)",
-    "(across independently validated studies)",
-    "(a claim well-supported by available evidence)",
-    "(this remains a productive area of inquiry)",
-    "(as logically follows from the premises)",
-    "(in keeping with standard academic practice)",
-    "(absent confounding variables)",
-    "(across methodologically diverse approaches)",
-    "(upon careful analytical examination)",
 ]
 
 # ---------------------------------------------------------------------------
@@ -614,22 +505,10 @@ _FILLER_MAP: dict = {
     "universal":  _UNIVERSAL_FILLERS,
 }
 
-_EXPANSION_MAP: dict = {
-    "bio":        _BIO_EXPANSION,
-    "tech":       _TECH_EXPANSION,
-    "humanities": _HUMANITIES_EXPANSION,
-    "social":     _SOCIAL_EXPANSION,
-    "natural":    _NATURAL_EXPANSION,
-    "education":  _EDUCATION_EXPANSION,
-    "law":        _LAW_EXPANSION,
-    "business":   _BUSINESS_EXPANSION,
-    "universal":  _UNIVERSAL_EXPANSION,
-}
-
 
 def _detect_domain(sentence: str) -> str:
     """
-    Score the sentence against each domain's keyword list.
+    Score the sentence against each domain keyword list.
     Returns the best-matching domain key, or 'universal' if no domain
     scores at least 2 keyword hits.
     """
@@ -645,26 +524,15 @@ def _detect_domain(sentence: str) -> str:
 
 def get_filler_phrase(sentence: str = "") -> str:
     """
-    Return a domain-appropriate filler expansion phrase.
-    Pass the current sentence text for context detection.
-    30 % of the time blends in a universal phrase to avoid monotony.
+    Return a domain-appropriate filler phrase.
+    Only called when _sentence_needs_filler() has already confirmed
+    the sentence genuinely needs expansion. 30% blends into universal
+    pool to prevent monotony within long same-domain documents.
     """
     domain = _detect_domain(sentence) if sentence else "universal"
     pool = _FILLER_MAP.get(domain, _UNIVERSAL_FILLERS)
     if random.random() < 0.3:
         pool = _UNIVERSAL_FILLERS
-    return random.choice(pool)
-
-
-def get_expansion_parenthetical(sentence: str = "") -> str:
-    """
-    Return a domain-appropriate expansion parenthetical.
-    Pass the current sentence text for context detection.
-    """
-    domain = _detect_domain(sentence) if sentence else "universal"
-    pool = _EXPANSION_MAP.get(domain, _UNIVERSAL_EXPANSION)
-    if random.random() < 0.3:
-        pool = _UNIVERSAL_EXPANSION
     return random.choice(pool)
 
 
@@ -755,24 +623,55 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
+# ===== FILLER GATE =====
+
+def _sentence_needs_filler(sentence: str, original: str) -> bool:
+    """
+    Hard gate — returns True ONLY when ALL three conditions are met:
+      1. The sentence is a genuine stub (under 7 words)
+      2. The shortfall vs the original is more than 5 words
+      3. The sentence does not already end with a parenthetical or clause
+
+    This is the single source of truth for filler injection.
+    Nothing in the pipeline appends a filler unless this returns True.
+    """
+    hum_count  = count_words(sentence)
+    orig_count = count_words(original)
+    shortfall  = orig_count - hum_count
+
+    already_extended = sentence.rstrip(".!?").endswith(")")
+    is_stub          = hum_count < 7
+    big_shortfall    = shortfall > 5
+
+    return is_stub and big_shortfall and not already_extended
+
+
 # ===== LENGTH ENFORCEMENT =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 3) -> str:
+    """
+    Trim or expand humanized text to match original word count within ±max_diff.
+    Filler is only appended when _sentence_needs_filler() confirms it is warranted.
+    """
     orig_count = count_words(original)
-    hum_count = count_words(humanized)
+    hum_count  = count_words(humanized)
 
     if abs(orig_count - hum_count) <= max_diff:
         return humanized
 
+    # Too long — trim
     if hum_count > orig_count + max_diff:
-        words = humanized.split()
-        keep = max(orig_count + max_diff - 1, min(orig_count, len(words)))
+        words  = humanized.split()
+        keep   = max(orig_count + max_diff - 1, min(orig_count, len(words)))
         trimmed = " ".join(words[:keep]).rstrip(",;—")
         return trimmed if trimmed[-1] in ".!?" else trimmed + "."
 
-    # Too short: append a context-aware filler phrase
-    humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized) + "."
+    # Too short — only fill genuine stubs, otherwise return as-is
+    if _sentence_needs_filler(humanized, original):
+        humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized) + "."
+
     return humanized
+
 
 def validate_and_correct_length(original: str, humanized: str, max_diff: int = 3) -> str:
     if abs(count_words(original) - count_words(humanized)) <= max_diff:
@@ -814,6 +713,10 @@ def _prepend_signpost(sent: str, opener: str) -> str:
 MODIFICATION_RATE = 0.38
 
 def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_RATE) -> str:
+    """
+    Apply subtle structural variations to a fraction of sentences.
+    Does NOT inject any filler phrases — restructures only.
+    """
     sentences = split_sentences(text)
     processed = []
 
@@ -829,16 +732,18 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
 
         technique = i % 4
 
+        # Technique 0: semicolon substitution between two independent clauses
         if technique == 0 and len(words) > 10:
             if "," in sent and len(words) > 12:
                 parts = sent.split(",", 1)
-                left_words = parts[0].split()
+                left_words  = parts[0].split()
                 right_words = parts[1].split()
                 if len(left_words) >= 5 and len(right_words) >= 5:
                     sent = parts[0] + "; " + parts[1].strip()
 
+        # Technique 1: hedging parenthetical after an anchor noun
         elif technique == 1 and len(words) > 8:
-            for idx, word in enumerate(words):
+            for word in words:
                 clean = word.lower().strip(",.!?;:")
                 if clean in ANCHOR_NOUNS:
                     sent = _insert_parenthetical_after_noun(
@@ -846,22 +751,27 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
                     )
                     break
 
+        # Technique 2: clause split at subordinating conjunctions
         elif technique == 2 and len(words) > 12:
             break_words = {"which", "where", "when", "while", "although"}
             for idx, word in enumerate(words):
                 if word.lower() in break_words and 3 < idx < len(words) - 4:
-                    fragment = " ".join(words[:idx]).rstrip(",") + ". "
+                    fragment  = " ".join(words[:idx]).rstrip(",") + ". "
                     remainder = " ".join(words[idx:])
                     remainder = remainder[0].upper() + remainder[1:]
                     sent = fragment + remainder
                     break
 
+        # Technique 3: compound split — replace "and" with adverbial phrase
         elif technique == 3 and len(words) > 10:
             if " and " in sent:
                 and_pos = sent.find(" and ")
-                before, after = sent[:and_pos].strip(), sent[and_pos + 5:].strip()
-                clause_verbs = {"is", "are", "was", "were", "has", "have",
-                                "controls", "regulates", "modulates", "governs"}
+                before  = sent[:and_pos].strip()
+                after   = sent[and_pos + 5:].strip()
+                clause_verbs = {
+                    "is", "are", "was", "were", "has", "have",
+                    "controls", "regulates", "modulates", "governs"
+                }
                 if (len(before.split()) > 4 and len(after.split()) > 4
                         and any(v in before.lower().split() for v in clause_verbs)):
                     sent = sent.replace(" and ", ", consequently, ", 1)
@@ -879,9 +789,10 @@ def final_obfuscation_layer(text: str, modification_rate: float = MODIFICATION_R
 SIGNPOST_RATE = 0.20
 
 def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
+    """Prepend signposting openers to a small subset of sentences."""
     sentences = split_sentences(text)
     processed = []
-    for i, sent in enumerate(sentences):
+    for sent in sentences:
         words = sent.split()
         if (len(words) > 5
                 and not is_markdown_heading(sent)
@@ -898,15 +809,16 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
 # ===== REPETITION ELIMINATION =====
 
 def eliminate_repetition(text: str) -> str:
+    """Reduce conceptual repetition via bigram overlap tracking."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
 
-    processed = []
+    processed    = []
     used_bigrams: set = set()
 
     for idx, sent in enumerate(sentences):
-        words = sent.lower().split()
+        words   = sent.lower().split()
         bigrams = {
             words[i].strip(",.!?;:") + " " + words[i + 1].strip(",.!?;:")
             for i in range(len(words) - 1)
@@ -928,6 +840,11 @@ def eliminate_repetition(text: str) -> str:
 # ===== BURSTINESS ENGINE =====
 
 def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
+    """
+    Impose sentence-length variation for natural prose rhythm.
+    Compression only — no filler expansion injected here.
+    Fillers are reserved exclusively for _sentence_needs_filler() stubs.
+    """
     if not sentences:
         return sentences
 
@@ -935,40 +852,41 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
     result = []
 
     for i, sent in enumerate(sentences):
-        words = sent.split()
+        words       = sent.split()
         current_len = len(words)
-        pattern = i % 5
+        pattern     = i % 5
 
-        if pattern == 0 and len(words) < int(current_len * 1.3):
-            # LONG: embed a context-aware subordinate clause
-            expansion = " through " + get_filler_phrase(sent) + "."
-            sent = sent.rstrip(".") + expansion
+        # Pattern 0: compress genuinely long sentences only
+        if pattern == 0 and current_len > 30:
+            target = max(int(current_len * 0.85), 15)
+            sent   = " ".join(words[:target]).rstrip(",;—")
+            if sent[-1] not in ".!?":
+                sent += "."
 
+        # Pattern 1: compress mid-length sentences
         elif pattern == 1:
-            # SHORT: compress
             target = max(int(current_len * 0.6), 4)
-            if len(words) > target:
+            if current_len > 22:
                 sent = " ".join(words[:target]) + "."
 
-        elif pattern == 2 and ";" not in sent and len(words) > 10:
-            # MEDIUM with semicolon
-            mid = len(words) // 2
+        # Pattern 2: semicolon split for medium+ sentences
+        elif pattern == 2 and ";" not in sent and current_len > 14:
+            mid  = current_len // 2
             sent = " ".join(words[:mid]) + "; " + " ".join(words[mid:])
 
-        elif pattern == 3 and len(words) > 7:
-            # SHORT fragment
+        # Pattern 3: short fragment from long sentences
+        elif pattern == 3 and current_len > 7:
             sent = " ".join(words[:4]) + "."
 
-        elif pattern == 4 and len(words) < 18:
-            # LONG with context-aware parenthetical
-            sent = sent.rstrip(".") + " " + get_expansion_parenthetical(sent) + "."
+        # Pattern 4: no filler expansion — pass through unchanged
+        # (previously injected get_expansion_parenthetical — removed)
 
         sent = re.sub(r"\s+", " ", sent).strip()
         if sent and sent[-1] not in ".!?":
             sent += "."
         result.append(sent)
 
-    # Verify total word count drift stays within 10%
+    # Keep total word count drift within 10%
     new_total = sum(count_words(s) for s in result)
     if abs(new_total - total_words) > int(total_words * 0.1):
         diff = new_total - total_words
@@ -983,31 +901,31 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
 # ===== LOCAL FALLBACK =====
 
 _WORD_REPLACEMENTS = {
-    r"\bimportant\b": ["key", "critical", "main", "essential", "central", "primary"],
+    r"\bimportant\b":        ["key", "critical", "main", "essential", "central", "primary"],
     r"\bplays a critical role\b": ["is essential", "is vital", "serves as", "underpins"],
-    r"\bplays a vital role\b": ["is essential", "is critical", "serves as", "anchors"],
-    r"\bis located\b": ["lies", "sits", "is found", "is situated", "resides"],
-    r"\bis composed of\b": ["contains", "has", "includes", "comprises", "incorporates"],
-    r"\bacts as\b": ["works as", "functions as", "serves as", "operates as"],
-    r"\bdue to\b": ["because of", "owing to", "as a result of", "stemming from"],
-    r"\boverall\b": ["in sum", "taken together", "collectively", "broadly"],
-    r"\badditionally\b": ["also", "plus", "further", "as well"],
-    r"\bhowever\b": ["yet", "though", "although", "nevertheless", "even so"],
-    r"\btherefore\b": ["thus", "hence", "so", "accordingly", "as such"],
-    r"\bconsequently\b": ["as a result", "thereby", "accordingly", "hence"],
-    r"\bregulates\b": ["controls", "governs", "modulates", "directs", "coordinates"],
-    r"\bcontains\b": ["holds", "possesses", "encompasses", "incorporates", "houses"],
-    r"\bresponsible for\b": ["accountable for", "charged with", "tasked with", "integral to"],
-    r"\bassociated with\b": ["linked to", "tied to", "connected with", "related to", "coupled with"],
-    r"\binvolved in\b": ["engaged in", "participating in", "contributing to", "implicated in"],
-    r"\bconsists of\b": ["comprises", "is made up of", "incorporates", "encompasses"],
-    r"\bpart of\b": ["component of", "element of", "constituent of", "segment of"],
-    r"\bfunction\b": ["role", "purpose", "operation", "activity", "capacity"],
-    r"\bstructure\b": ["anatomy", "architecture", "framework", "morphology", "configuration"],
-    r"\bprocess\b": ["mechanism", "procedure", "pathway", "sequence", "cascade"],
-    r"\bcontrol\b": ["regulation", "management", "oversight", "direction", "governance"],
-    r"\bphenomenon\b": ["occurrence", "event", "manifestation", "observation", "finding"],
-    r"\bframework\b": ["schema", "construct", "paradigm", "architecture", "scaffold"],
+    r"\bplays a vital role\b":    ["is essential", "is critical", "serves as", "anchors"],
+    r"\bis located\b":       ["lies", "sits", "is found", "is situated", "resides"],
+    r"\bis composed of\b":   ["contains", "has", "includes", "comprises", "incorporates"],
+    r"\bacts as\b":          ["works as", "functions as", "serves as", "operates as"],
+    r"\bdue to\b":           ["because of", "owing to", "as a result of", "stemming from"],
+    r"\boverall\b":          ["in sum", "taken together", "collectively", "broadly"],
+    r"\badditionally\b":     ["also", "plus", "further", "as well"],
+    r"\bhowever\b":          ["yet", "though", "although", "nevertheless", "even so"],
+    r"\btherefore\b":        ["thus", "hence", "so", "accordingly", "as such"],
+    r"\bconsequently\b":     ["as a result", "thereby", "accordingly", "hence"],
+    r"\bregulates\b":        ["controls", "governs", "modulates", "directs", "coordinates"],
+    r"\bcontains\b":         ["holds", "possesses", "encompasses", "incorporates", "houses"],
+    r"\bresponsible for\b":  ["accountable for", "charged with", "tasked with", "integral to"],
+    r"\bassociated with\b":  ["linked to", "tied to", "connected with", "related to", "coupled with"],
+    r"\binvolved in\b":      ["engaged in", "participating in", "contributing to", "implicated in"],
+    r"\bconsists of\b":      ["comprises", "is made up of", "incorporates", "encompasses"],
+    r"\bpart of\b":          ["component of", "element of", "constituent of", "segment of"],
+    r"\bfunction\b":         ["role", "purpose", "operation", "activity", "capacity"],
+    r"\bstructure\b":        ["anatomy", "architecture", "framework", "morphology", "configuration"],
+    r"\bprocess\b":          ["mechanism", "procedure", "pathway", "sequence", "cascade"],
+    r"\bcontrol\b":          ["regulation", "management", "oversight", "direction", "governance"],
+    r"\bphenomenon\b":       ["occurrence", "event", "manifestation", "observation", "finding"],
+    r"\bframework\b":        ["schema", "construct", "paradigm", "architecture", "scaffold"],
 }
 
 _COMPILED_REPLACEMENTS = {
@@ -1016,6 +934,10 @@ _COMPILED_REPLACEMENTS = {
 }
 
 def local_humanize(sent: str, index: int) -> str:
+    """
+    Fallback humanizer — vocabulary substitution and structural variation only.
+    Never appends filler clauses; compression and restructuring only.
+    """
     words = sent.split()
     if not words:
         return sent
@@ -1024,17 +946,18 @@ def local_humanize(sent: str, index: int) -> str:
     for pattern, choices in _COMPILED_REPLACEMENTS.items():
         h = pattern.sub(lambda m, c=choices: random.choice(c), h)
 
+    # Structural variation: compress or restructure — never expand with filler
     if index % 3 == 0 and len(words) > 8:
         h = " ".join(words[:6]) + "."
-    elif index % 3 == 1 and len(words) < 10:
-        h = h.rstrip(".") + ", which remains essential for proper function."
     elif index % 3 == 2 and "," in h:
         h = h.replace(",", ";", 1)
+    # index % 3 == 1 previously appended ", which remains essential for proper
+    # function." to every third sentence — removed entirely.
 
+    # Signpost opener on every 7th sentence
     if (index % 7 == 0 and len(words) > 5
             and not is_markdown_heading(h) and not is_markdown_list(h)):
-        opener = get_signpost_opener()
-        h = _prepend_signpost(h, opener)
+        h = _prepend_signpost(h, get_signpost_opener())
 
     return h
 
@@ -1069,7 +992,13 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 - Mirror the technical register and vocabulary density of the original.
 - Do not simplify specialized terms; replace them only with equally precise synonyms from the same field.
 
-6. HUMAN QUIRKS FOR DETECTION BYPASS
+6. CONTENT FIDELITY — CRITICAL
+- Every detail, fact, figure, and claim in the original sentence must appear in the rewrite.
+- Do NOT drop clauses, omit data points, skip qualifications, or remove named entities.
+- If a sentence says "X causes Y under condition Z", the rewrite must retain X, Y, and Z.
+- Restructuring is allowed; omission is not.
+
+7. HUMAN QUIRKS FOR DETECTION BYPASS
 - Use "we" or "our" occasionally (1-2 times per paragraph max).
 - Start 1 in 5 sentences with "But" or "Yet" ONLY when creating contrast.
 - Use sentence fragments (3-6 words, no verb) strategically.
@@ -1077,7 +1006,7 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
 - Use parentheticals sparingly: (notably), (evidently), (under normal conditions), (by extension), (presumably).
 - Vary sentence openers: "Interestingly," "Specifically," "In this context," "Conversely," "As expected," "From an analytical standpoint,"
 
-7. VERB PHRASE VARIATION
+8. VERB PHRASE VARIATION
 - Never repeat the same verb phrase twice in one paragraph.
 - Vary according to the detected domain:
   Science/Bio:   "regulates" → "controls" → "governs" → "modulates" → "mediates" → "coordinates"
@@ -1087,26 +1016,28 @@ NEVER USE: delve, testament, pivotal, moreover, furthermore, crucially, undersco
   Business/Econ: "generates" → "yields" → "produces" → "drives" → "sustains" → "captures"
   General:       "demonstrates" → "indicates" → "reveals" → "reflects" → "highlights" → "confirms"
 
-8. REPETITION ELIMINATION
+9. REPETITION ELIMINATION
 - Never use the same noun phrase twice in one paragraph.
 
-9. CITATION & MARKDOWN PRESERVATION
+10. CITATION & MARKDOWN PRESERVATION
 - Keep (Author, 2020), [1], [1-3] exactly as written.
 - Preserve # headings, ## subheadings, * bullet points, 1. numbered lists EXACTLY.
 - Do not turn "## Location" into a sentence. Headings must remain as: ## Heading Text
 
-10. ACADEMIC TONE TARGET
+11. ACADEMIC TONE TARGET
 - Write like a tenured professor with 30 years of publishing experience in the detected field.
 - Use active voice 60% of the time, passive 40%.
 
 OUTPUT ONLY VALID JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact text","humanized":"rewrite","alternatives":["alt1","alt2","alt3"]}]}]}"""
 
+
 # ===== CORRECTION LOOP =====
 
 def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str:
+    """Re-query Mistral when length drift exceeds tolerance."""
     orig_count = count_words(original)
-    hum_count = count_words(humanized)
+    hum_count  = count_words(humanized)
 
     if abs(orig_count - hum_count) <= 3:
         return humanized
@@ -1121,6 +1052,7 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 f"Your Rewrite: \"{humanized}\"\n\n"
                 f"Task: Adjust your rewrite so it matches EXACTLY {orig_count} words (tolerance +/- 2). "
                 f"Maintain elite academic cadence and precise terminology. "
+                f"CRITICAL: Do not omit any facts, figures, or named entities from the original. "
                 f"Output ONLY the corrected sentence string, no quotes, no explanation."
             )
             resp = client.chat.complete(
@@ -1132,8 +1064,8 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
             corrected = resp.choices[0].message.content.strip().strip("\"'")
             if abs(orig_count - count_words(corrected)) <= 3:
                 return corrected
-            humanized = corrected
-            hum_count = count_words(humanized)
+            humanized  = corrected
+            hum_count  = count_words(humanized)
         except Exception as e:
             print(f"Correction loop attempt {attempt + 1} failed: {e}")
             break
@@ -1153,7 +1085,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
             lines.append(f"{j + 1}. [{count_words(s)} words] {s}")
         lines.append("")
 
-    data = None
+    data         = None
     mistral_error = None
 
     try:
@@ -1166,8 +1098,11 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                     "content": (
                         f"Style: {style}\n\n"
                         "Humanize this academic text. Word counts are in [brackets]. "
-                        "Match them exactly within +/- 2 words. Preserve all markdown headings "
-                        "(##, ###) and list items (*, 1.) exactly as written:\n\n"
+                        "Match them exactly within +/- 2 words. "
+                        "Preserve every detail from the original — do not drop any facts, "
+                        "figures, named entities, or qualifications. "
+                        "Preserve all markdown headings (##, ###) and list items (*, 1.) "
+                        "exactly as written:\n\n"
                         + "\n".join(lines)
                     ),
                 },
@@ -1223,17 +1158,17 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
 
         for j, sent in enumerate(para.get("sentences", [])):
             orig = sent.get("original", "")
-            h = sent.get("humanized", "") or local_humanize(orig, j)
-            h = correction_loop(orig, h)
-            h = validate_and_correct_length(orig, h, max_diff=3)
+            h    = sent.get("humanized", "") or local_humanize(orig, j)
+            h    = correction_loop(orig, h)
+            h    = validate_and_correct_length(orig, h, max_diff=3)
             para_sentences.append({
-                "orig": orig,
-                "hum": h,
+                "orig":     orig,
+                "hum":      h,
                 "raw_alts": sent.get("alternatives", [])[:3],
             })
 
-        # Burstiness at paragraph level — pass sentence text for domain detection
-        humanized_only = [s["hum"] for s in para_sentences]
+        # Burstiness at paragraph level — compression only, no filler injection
+        humanized_only  = [s["hum"] for s in para_sentences]
         burst_sentences = syntactic_burstiness_engine(humanized_only)
 
         for j, (sent_data, h) in enumerate(zip(para_sentences, burst_sentences)):
@@ -1257,7 +1192,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                     alt += "."
                 clean_alts.append(alt)
 
-            orig_lower = sent_data["orig"].lower().strip()
+            orig_lower  = sent_data["orig"].lower().strip()
             unique_alts: List[str] = []
             seen_lowers: set = set()
 
@@ -1297,10 +1232,10 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
 async def process(req: ProcessRequest):
     if not req.text.strip():
         raise HTTPException(400, "Empty text")
-    pars = split_paragraphs(req.text)
+    pars     = split_paragraphs(req.text)
     processed = humanize_with_mistral(pars, req.style)
-    all_s = [s for p in processed for s in p.sentences]
-    avg = sum(s.score for s in all_s) / len(all_s) if all_s else 0
+    all_s    = [s for p in processed for s in p.sentences]
+    avg      = sum(s.score for s in all_s) / len(all_s) if all_s else 0
     return ProcessResponse(
         processed_paragraphs=processed,
         total_sentences=len(all_s),
