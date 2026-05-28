@@ -51,14 +51,6 @@ class ProcessResponse(BaseModel):
 
 # ===== VOCABULARY SYSTEM =====
 
-STRUCTURAL_NOUNS = {
-    "framework", "methodology", "nexus", "phenomenon", "correlate", "paradigm",
-    "trajectory", "substrate", "interface", "topology", "architecture", "mechanism",
-    "apparatus", "ensemble", "configuration", "modality", "repertoire", "contingency",
-    "disposition", "gradient", "recursion", "hierarchy", "manifold", "schema",
-    "ontology", "taxonomy", "morphology", "anatomy", "physiology", "homeostasis"
-}
-
 ANCHOR_NOUNS = {
     "cerebellum", "medulla", "pons", "cortex", "tracts", "nuclei", "nerves",
     "arteries", "pyramids", "olives", "structure", "organ", "system", "pathway",
@@ -102,284 +94,85 @@ AI_TELL_PHRASES = {
 
 
 # ===========================================================================
-# ===== DOMAIN-AWARE FILLER SYSTEM ==========================================
+# ===== RESTRAINED FILLER SYSTEM ============================================
 # ===========================================================================
 
-HEDGING_PARENTHETICALS: list = [
-    "(arguably)",
-    "(presumably)",
-    "(by extension)",
-    "(virtually)",
-    "(notably)",
-    "(evidently)",
-    "(characteristically)",
-    "(as expected)",
-    "(in most cases)",
-    "(broadly speaking)",
-    "(on balance)",
-    "(to some degree)",
-    "(in principle)",
-    "(to varying extents)",
-    "(within reason)",
-    "(contextually)",
-    "(under typical conditions)",
-    "(in relative terms)",
-    "(with few exceptions)",
-    "(under standard assumptions)",
-    "(in theoretical terms)",
-    "(empirically speaking)",
-    "(all else being equal)",
-    "(in general terms)",
-    "(as conventionally understood)",
-    "(by most accounts)",
-    "(from a functional standpoint)",
-    "(by current consensus)",
-    "(in practical terms)",
-    "(in the broader sense)",
-]
-
-SIGNPOST_OPENERS: list = [
-    "From an analytical standpoint,",
-    "Within this framework,",
-    "Interestingly,",
-    "Notably,",
-    "In practice,",
-    "Under these conditions,",
-    "Specifically,",
-    "In effect,",
-    "Conversely,",
-    "As expected,",
-    "In this context,",
-    "Evidently,",
-    "Consequently,",
-    "Alternatively,",
-    "In particular,",
-    "By comparison,",
-    "In such cases,",
-    "Naturally,",
-    "Broadly speaking,",
-    "Within this specific context,",
-    "Taken together,",
-    "Viewed through this lens,",
-    "On closer inspection,",
-    "As the evidence suggests,",
-    "In the present case,",
-    "By the same token,",
-    "At the same time,",
-    "In a related vein,",
-    "Against this backdrop,",
-    "In light of this,",
-    "To this end,",
-    "In doing so,",
-    "For this reason,",
-    "By extension,",
-    "From this perspective,",
-    "Upon reflection,",
-    "With this in mind,",
-    "In the same manner,",
-    "To a certain extent,",
-    "Alongside this,",
-    "In broader terms,",
-    "Under closer scrutiny,",
-    "When considered carefully,",
-    "At its core,",
-    "From a structural standpoint,",
-    "Taken in isolation,",
-    "In the aggregate,",
-    "Across domains,",
-    "Fundamentally,",
-    "What matters here is",
-    "The key point is that",
-    "This is not incidental;",
-    "Worth emphasizing here:",
-    "The data point to",
-    "Structurally speaking,",
-    "At a finer level of analysis,",
-    "The picture is more nuanced:",
-    "This distinction matters because",
-    "Looking more closely,",
+# All fillers are neutral, academic, and register-consistent. No theatrical flair.
+_UNIVERSAL_FILLERS: list = [
+    "as described above.",
+    "under standard conditions.",
+    "within the experimental framework.",
+    "as previously reported.",
+    "under these parameters.",
+    "as outlined in the methodology.",
+    "within the defined scope.",
+    "as noted earlier.",
+    "under normal operating conditions.",
+    "within the established model.",
 ]
 
 _BIO_FILLERS: list = [
-    "through integrated feedback loops",
-    "via polysynaptic relay pathways",
-    "under homeostatic regulation",
-    "through descending cortical input",
-    "via ascending somatosensory relays",
-    "contingent on afferent signal integrity",
-    "across distributed neural assemblies",
-    "within tightly regulated homeostatic bounds",
-    "through reciprocal thalamocortical projections",
-    "under conditions of normal physiological demand",
-    "via efferent motor output channels",
-    "through coordinated synaptic transmission",
-    "under autonomic nervous system oversight",
-    "across convergent sensorimotor pathways",
-    "through receptor-mediated signal transduction",
-    "via chemokine-guided cellular recruitment",
-    "under conditions of metabolic equilibrium",
-    "through paracrine intercellular signaling",
-    "within genetically encoded regulatory networks",
-    "via post-translational protein modification",
+    "as previously described.",
+    "under standard physiological conditions.",
+    "across all experimental groups.",
+    "within the defined parameters.",
+    "as shown in the figure.",
 ]
 
 _TECH_FILLERS: list = [
-    "within tightly constrained computational parameters",
-    "contingent on data stream integrity",
-    "via iterative algorithmic refinement",
-    "under standard experimental conditions",
-    "through layered abstraction hierarchies",
-    "across distributed processing nodes",
-    "via stochastic gradient optimization",
-    "under defined boundary conditions",
-    "through recursive logical decomposition",
-    "contingent on model convergence criteria",
-    "via parallel execution pipelines",
-    "within the defined state space",
-    "through probabilistic inference mechanisms",
-    "across heterogeneous network topologies",
-    "under controlled simulation parameters",
-    "via adaptive error-correction protocols",
-    "within formally specified constraint sets",
-    "through modular system decomposition",
-    "under worst-case asymptotic bounds",
-    "via deterministic finite-state transitions",
+    "as previously described.",
+    "under standard experimental conditions.",
+    "across all test cases.",
+    "within the defined parameters.",
+    "as implemented in the methodology.",
 ]
 
 _HUMANITIES_FILLERS: list = [
-    "within prevailing theoretical frameworks",
-    "through established socio-cultural paradigms",
-    "contingent on historical contextual variables",
-    "across distinct analytical dimensions",
-    "through critical hermeneutic engagement",
-    "via discursive power structures",
-    "within historically situated interpretive horizons",
-    "through comparative textual analysis",
-    "across divergent ideological formations",
-    "via dialectical modes of inquiry",
-    "within contested epistemic traditions",
-    "through sustained close reading practices",
-    "across geopolitical and temporal boundaries",
-    "via intertextual referential networks",
-    "through phenomenological interpretive frameworks",
-    "within the logic of the historical archive",
-    "across competing scholarly genealogies",
-    "through narratological structural analysis",
-    "via ideological critique and deconstruction",
-    "within dominant and subaltern discourses",
+    "as discussed above.",
+    "within the established framework.",
+    "across the relevant literature.",
+    "under the stated assumptions.",
+    "as outlined previously.",
 ]
 
 _SOCIAL_FILLERS: list = [
-    "through established socio-institutional mechanisms",
-    "within prevailing policy frameworks",
-    "contingent on baseline contextual variables",
-    "via iterative social feedback processes",
-    "across macro- and micro-level analytical scales",
-    "through latent structural inequalities",
-    "under conditions of institutional constraint",
-    "via incentive-compatible behavioral mechanisms",
-    "within normative regulatory environments",
-    "through mediating psychosocial pathways",
-    "across heterogeneous population subgroups",
-    "via rational-choice optimization models",
-    "within structurally embedded power relations",
-    "through cognitive-behavioral regulatory processes",
-    "contingent on socioeconomic baseline conditions",
-    "across intersecting axes of identity",
-    "via self-reinforcing institutional feedback loops",
-    "within bounded rationality frameworks",
-    "through stratified sampling methodological designs",
-    "across longitudinal observational time points",
+    "as previously described.",
+    "within the sampled population.",
+    "across all survey waves.",
+    "under the stated conditions.",
+    "as reported in the literature.",
 ]
 
 _NATURAL_FILLERS: list = [
-    "through thermodynamically driven processes",
-    "via molecular diffusion gradients",
-    "under equilibrium state conditions",
-    "through biogeochemical cycling pathways",
-    "across spatiotemporal ecological gradients",
-    "via catalytic reaction intermediates",
-    "within energetically bounded system states",
-    "through coupled atmospheric-oceanic dynamics",
-    "contingent on ambient environmental conditions",
-    "via second-law thermodynamic constraints",
-    "across trophic energy transfer levels",
-    "through quantum mechanical wave-particle interactions",
-    "under standard temperature and pressure conditions",
-    "via electrochemical potential gradients",
-    "within defined thermodynamic phase boundaries",
-    "through stochastic environmental perturbations",
-    "across macro- and micro-ecological scales",
-    "via radiative energy transfer mechanisms",
-    "within geologically constrained timescales",
-    "through oxidation-reduction reaction cycles",
+    "as previously described.",
+    "under standard temperature and pressure.",
+    "across all measured samples.",
+    "within the defined system.",
+    "as shown in the analysis.",
 ]
 
 _EDUCATION_FILLERS: list = [
-    "through scaffolded instructional sequences",
-    "via formative assessment feedback loops",
-    "under constructivist pedagogical frameworks",
-    "across differentiated learning modalities",
-    "through metacognitive self-regulatory strategies",
-    "via zone-of-proximal-development scaffolding",
-    "within socially situated learning environments",
-    "through inquiry-based instructional design",
-    "across culturally responsive curriculum frameworks",
-    "via deliberate practice and spaced repetition",
+    "as previously described.",
+    "within the study cohort.",
+    "across all instructional conditions.",
+    "under the stated parameters.",
+    "as outlined in the design.",
 ]
 
 _LAW_FILLERS: list = [
-    "within applicable statutory and regulatory frameworks",
-    "contingent on jurisdictional precedent",
-    "through established common law doctrine",
-    "via judicial interpretive mechanisms",
-    "under constitutional due process constraints",
-    "through adversarial procedural safeguards",
-    "across distinct jurisprudential traditions",
-    "via proportionality and balancing tests",
-    "within legislatively defined normative boundaries",
-    "through equitable remedial discretion",
+    "as previously described.",
+    "within the applicable jurisdiction.",
+    "under the stated precedent.",
+    "across all relevant statutes.",
+    "as outlined in the opinion.",
 ]
 
 _BUSINESS_FILLERS: list = [
-    "through market-driven competitive mechanisms",
-    "via resource allocation optimization processes",
-    "contingent on supply-chain operational integrity",
-    "across vertically and horizontally integrated structures",
-    "through risk-adjusted return optimization",
-    "via dynamic capability reconfiguration",
-    "within evolving competitive market landscapes",
-    "through stakeholder value alignment strategies",
-    "under conditions of information asymmetry",
-    "via transaction cost minimization mechanisms",
-    "across diversified portfolio risk structures",
-    "through behavioral economic decision frameworks",
-    "contingent on macroeconomic baseline conditions",
-    "via financial instrument pricing models",
-    "within regulatory compliance frameworks",
-]
-
-_UNIVERSAL_FILLERS: list = [
-    "through inherently integrated processes",
-    "within clearly defined boundaries",
-    "under normal operational conditions",
-    "via closely coordinated internal mechanisms",
-    "contingent on underlying structural integrity",
-    "across multiple interconnected dimensions",
-    "through systematically organized pathways",
-    "within established theoretical parameters",
-    "under standard analytical conditions",
-    "via well-documented empirical patterns",
-    "across rigorously controlled conditions",
-    "through convergent lines of evidence",
-    "within broadly accepted scholarly norms",
-    "via recursive self-reinforcing dynamics",
-    "under conditions of internal consistency",
-    "through mutually reinforcing causal chains",
-    "across diverse empirical contexts",
-    "within methodologically defined constraints",
-    "through complementary analytical approaches",
-    "via interrelated systemic components",
+    "as previously described.",
+    "within the analyzed period.",
+    "across all reported segments.",
+    "under the stated assumptions.",
+    "as noted in the filing.",
 ]
 
 _DOMAIN_KEYWORDS: dict = {
@@ -484,9 +277,7 @@ _FILLER_MAP: dict = {
     "education":  _EDUCATION_FILLERS,
     "law":        _LAW_FILLERS,
     "business":   _BUSINESS_FILLERS,
-    "universal":  _UNIVERSAL_FILLERS,
 }
-
 
 def _detect_domain(sentence: str) -> str:
     text = sentence.lower()
@@ -498,21 +289,12 @@ def _detect_domain(sentence: str) -> str:
     best = max(scores, key=lambda d: scores[d])
     return best if scores[best] >= 2 else "universal"
 
-
 def get_filler_phrase(sentence: str = "") -> str:
     domain = _detect_domain(sentence) if sentence else "universal"
     pool = _FILLER_MAP.get(domain, _UNIVERSAL_FILLERS)
     if random.random() < 0.3:
         pool = _UNIVERSAL_FILLERS
     return random.choice(pool)
-
-
-def get_hedging_parenthetical() -> str:
-    return random.choice(HEDGING_PARENTHETICALS)
-
-
-def get_signpost_opener() -> str:
-    return random.choice(SIGNPOST_OPENERS)
 
 
 # ===== TEXT SPLITTING =====
@@ -549,48 +331,70 @@ def is_markdown_list(text: str) -> bool:
 
 
 # ===== SCORING =====
+# Lower score = more human. Penalizes AI patterns AND over-stylization.
 
 def score_sentence(sent: str) -> float:
     s = sent.lower()
     words = sent.split()
     score = 0
 
+    # Penalize AI tell phrases heavily
     for tell in AI_TELL_PHRASES:
         if tell in s:
             score += 20
 
+    # Penalize the "sweet spot" length that AI loves (15-22 words, every sentence)
     if 15 <= len(words) <= 22:
         score += 8
 
+    # Penalize formulaic transitional openers
     if words:
         first = words[0].lower().strip(",.!?;:")
         if first in TRANSITIONAL_OPENERS:
             score += 15
 
+    # Penalize low lexical diversity
     if len(words) > 5:
         unique_ratio = len({w.lower() for w in words}) / len(words)
         if unique_ratio < 0.5:
             score += 12
 
+    # Penalize over-punctuated sentences (AI stacking clauses)
     if sent.count(",") > 3 or sent.count(";") > 2:
         score += 12
 
     if "operating continuously" in s:
         score += 25
 
+    # Penalize very short sentences that are not headings/lists (likely truncation artifacts)
     if len(words) < 4 and not (sent.startswith("#") or sent.startswith("*")):
         score += 15
 
+    # Penalize sentences that are all passive + abstract noun combos
     passive_markers = ["is", "are", "was", "were", "be", "been", "being"]
     passive_count = sum(1 for w in words if w.lower() in passive_markers)
     if passive_count > 3 and len(words) < 18:
         score += 8
 
-    if sent.endswith("?") or "—" in sent:
+    # Penalize theatrical / rhetorical language (new)
+    theatrical = ["let us not forget", "wreak havoc", "doorstep", "theatrical", "dramatic"]
+    for t in theatrical:
+        if t in s:
+            score += 18
+
+    # Penalize overuse of metaphorical language
+    metaphor_markers = ["journey", "battle", "war", "fight", "struggle", "triumph", "sweep"]
+    for m in metaphor_markers:
+        if m in s:
+            score += 10
+
+    # Reward natural sentence-ending variety
+    if sent.endswith("?"):
         score = max(0, score - 10)
 
+    # Reward use of "we" / "our" (human authorial voice) — but only sparingly
     if " we " in s or s.startswith("we ") or " our " in s:
-        score = max(0, score - 8)
+        score = max(0, score - 5)
 
     return min(100.0, max(0.0, float(score)))
 
@@ -599,7 +403,49 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
-# ===== LENGTH ENFORCEMENT (ported from working version) =====
+# ===== GRAMMATICAL SAFETY HELPERS =====
+
+_COMMON_VERBS = {
+    "is", "are", "was", "were", "be", "been", "being",
+    "has", "have", "had", "do", "does", "did",
+    "shows", "show", "demonstrates", "demonstrate", "indicates", "indicate",
+    "reveals", "reveal", "suggests", "suggest", "implies", "imply",
+    "controls", "control", "governs", "govern", "modulates", "modulate",
+    "regulates", "regulate", "mediates", "mediate", "coordinates", "coordinate",
+    "produces", "produce", "generates", "generate", "processes", "process",
+    "occurs", "occur", "results", "result", "leads", "lead",
+    "contributes", "contribute", "plays", "play", "functions", "function",
+    "operates", "operate", "acts", "act", "serves", "serve",
+    "works", "work", "constitutes", "constitute", "represents", "represent",
+    "reflects", "reflect", "underlies", "underlie", "derives", "derive",
+    "requires", "require", "involves", "involve", "includes", "include",
+    "comprises", "comprise", "contains", "contain", "exhibits", "exhibit",
+    "manifests", "manifest", "presents", "present", "displays", "display",
+    "confirms", "confirm", "establishes", "establish", "supports", "support",
+    "explains", "explain", "accounts", "account", "determines", "determine",
+    "defines", "define", "describes", "describe", "identifies", "identify",
+    "recognizes", "recognize", "observes", "observe", "notes", "note",
+    "finds", "find", "reports", "report", "states", "state",
+    "argues", "argue", "claims", "claim", "asserts", "assert",
+    "posits", "posit", "maintains", "maintain", "contends", "contend",
+    "acknowledges", "acknowledge", "accepts", "accept", "rejects", "reject",
+    "challenges", "challenge", "questions", "question", "examines", "examine",
+    "investigates", "investigate", "evaluates", "evaluate", "assesses", "assess",
+    "measures", "measure", "calculates", "calculate", "estimates", "estimate",
+    "quantifies", "quantify", "characterizes", "characterize", "specifies", "specify",
+}
+
+def _has_verb(words: list[str]) -> bool:
+    return any(w.lower().strip(",.!?;:") in _COMMON_VERBS for w in words)
+
+def _safe_end(text: str) -> str:
+    text = text.rstrip(",;—")
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text
+
+
+# ===== LENGTH ENFORCEMENT =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) -> str:
     """Ensure humanized text stays within word count bounds of original."""
@@ -613,32 +459,49 @@ def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) 
         words = humanized.split()
         keep = max(orig_count + max_diff - 1, 5)
         trimmed = " ".join(words[:keep])
-        if trimmed[-1] in ',;—':
-            trimmed = trimmed[:-1]
-        if trimmed[-1] not in '.!?':
-            trimmed += '.'
-        return trimmed
+        trimmed = _safe_end(trimmed)
+        # Only accept if it still has a verb; otherwise return original humanized
+        if _has_verb(trimmed.split()):
+            return trimmed
+        return humanized
 
     if hum_count < orig_count - max_diff:
-        humanized = humanized.rstrip('.') + ' ' + get_filler_phrase(humanized) + '.'
+        humanized = humanized.rstrip(".") + " " + get_filler_phrase(humanized)
 
     return humanized
 
 
-# ===== OBFUSCATION LAYER (ported from working version) =====
+# ===== OBFUSCATION LAYER (restrained) =====
+# Only subtle, register-consistent modifications. No theatrical flourishes.
 
 def final_obfuscation_layer(text: str) -> str:
-    """Apply subtle linguistic variations. No technique overused."""
     sentences = split_sentences(text)
     processed = []
 
     for i, sent in enumerate(sentences):
         words = sent.split()
-        if not words:
+        if not words or len(words) < 6:
+            processed.append(sent)
             continue
 
-        # Only apply to ~30% of sentences, rotate techniques
-        if i % 3 == 0 and len(words) > 8:
+        # Apply to ~25% of sentences max
+        if random.random() > 0.25:
+            processed.append(sent)
+            continue
+
+        technique = random.randint(0, 2)
+
+        if technique == 0 and len(words) > 12:
+            # One comma → semicolon, but only if both clauses are substantial
+            if "," in sent:
+                parts = sent.split(",", 1)
+                left_words = parts[0].split()
+                right_words = parts[1].split()
+                if len(left_words) >= 5 and len(right_words) >= 5:
+                    sent = parts[0] + "; " + parts[1].strip()
+
+        elif technique == 1 and len(words) > 8:
+            # Single subtle synonym swap (max 1 per sentence)
             swaps = {
                 "the": ["this", "that"],
                 "is": ["remains", "constitutes"],
@@ -650,8 +513,6 @@ def final_obfuscation_layer(text: str) -> str:
                 "for": ["regarding"],
                 "with": ["via"],
                 "by": ["through"],
-                "from": ["originating in"],
-                "as": ["functioning as"],
             }
             swap_count = 0
             for idx, word in enumerate(words):
@@ -666,28 +527,57 @@ def final_obfuscation_layer(text: str) -> str:
                     swap_count += 1
             sent = " ".join(words)
 
-        elif i % 3 == 1 and len(words) > 12:
-            if "," in sent:
-                parts = sent.split(",", 1)
-                sent = parts[0] + "; " + parts[1]
+        elif technique == 2 and len(words) > 14:
+            # Split at relative pronoun only if it creates two complete sentences
+            break_words = {"which", "where", "when", "while"}
+            for idx, word in enumerate(words):
+                if word.lower() in break_words and 4 < idx < len(words) - 4:
+                    left = " ".join(words[:idx]).rstrip(",") + ". "
+                    right = " ".join(words[idx:])
+                    right = right[0].upper() + right[1:]
+                    if _has_verb(left.split()) and _has_verb(right.split()):
+                        sent = left + right
+                    break
 
-        elif i % 3 == 2 and len(words) > 10:
-            insert_point = min(3, len(words) - 2)
-            words.insert(insert_point, "(notably)")
-            sent = " ".join(words)
-
-        sent = re.sub(r'\s+', ' ', sent).strip()
-        if sent and sent[-1] not in '.!?':
-            sent += '.'
-
+        sent = re.sub(r"\s+", " ", sent).strip()
+        sent = _safe_end(sent)
         processed.append(sent)
 
     return " ".join(processed)
 
 
-# ===== SIGNPOST LAYER =====
+# ===== SIGNPOST LAYER (restrained) =====
+# Reduced rate, only academic openers, never consecutive.
 
-SIGNPOST_RATE = 0.12
+_SIGNPOST_OPENERS: list = [
+    "Specifically,",
+    "In this context,",
+    "Consequently,",
+    "Alternatively,",
+    "Notably,",
+    "In practice,",
+    "Evidently,",
+    "By comparison,",
+    "Taken together,",
+    "From this perspective,",
+    "In such cases,",
+    "Under these conditions,",
+]
+
+SIGNPOST_RATE = 0.08
+
+def _prepend_signpost(sent: str, opener: str) -> str:
+    sent = sent.strip()
+    if not sent:
+        return sent
+    opener = opener.strip()
+    if opener.endswith(","):
+        first_char = sent[0]
+        rest = sent[1:]
+        sent_body = first_char.lower() + rest
+    else:
+        sent_body = sent
+    return f"{opener} {sent_body}"
 
 def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
     sentences = split_sentences(text)
@@ -700,10 +590,9 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
                 and not is_markdown_list(sent)
                 and random.random() < rate
                 and consecutive_signposted == 0):
-            sent = _prepend_signpost(sent, get_signpost_opener())
+            sent = _prepend_signpost(sent, random.choice(_SIGNPOST_OPENERS))
             sent = re.sub(r"\s+", " ", sent).strip()
-            if sent and sent[-1] not in ".!?":
-                sent += "."
+            sent = _safe_end(sent)
             consecutive_signposted = 1
         else:
             consecutive_signposted = 0
@@ -711,29 +600,34 @@ def apply_signpost_openers(text: str, rate: float = SIGNPOST_RATE) -> str:
     return " ".join(processed)
 
 
-# ===== REPETITION ELIMINATION (ported from working version) =====
+# ===== REPETITION ELIMINATION (gentle) =====
+# Never chops blindly to 5 words. Only compresses if a complete clause can be formed.
 
 def eliminate_repetition(text: str) -> str:
-    """Reduce conceptual repetition within paragraphs using n-gram overlap."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
 
     processed = []
-    used_bigrams = set()
+    used_bigrams: set = set()
 
-    for sent in sentences:
+    for idx, sent in enumerate(sentences):
         words = sent.lower().split()
-        bigrams = set()
-        for i in range(len(words) - 1):
-            bg = words[i].strip(",.!?;:") + " " + words[i+1].strip(",.!?;:")
-            bigrams.add(bg)
+        bigrams = {
+            words[i].strip(",.!?;:") + " " + words[i + 1].strip(",.!?;:")
+            for i in range(len(words) - 1)
+        }
 
         overlap = len(bigrams & used_bigrams)
         overlap_ratio = overlap / len(bigrams) if bigrams else 0
 
-        if overlap_ratio > 0.3 and len(words) > 6:
-            sent = ' '.join(words[:5]) + "."
+        if overlap_ratio > 0.35 and len(words) > 10:
+            # Gentle compression to first half, but only if result is complete
+            target = max(6, len(words) // 2)
+            candidate = " ".join(words[:target]).rstrip(",;—")
+            candidate = _safe_end(candidate)
+            if _has_verb(candidate.split()):
+                sent = candidate
 
         used_bigrams.update(bigrams)
         if len(processed) > 0 and len(processed) % 5 == 0:
@@ -744,10 +638,10 @@ def eliminate_repetition(text: str) -> str:
     return " ".join(processed)
 
 
-# ===== BURSTINESS ENGINE (ported from working version) =====
+# ===== BURSTINESS ENGINE (safe) =====
+# Variation is introduced, but every sentence must remain grammatically complete.
 
 def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
-    """Apply length variation patterns. No em-dashes."""
     if not sentences:
         return sentences
 
@@ -757,145 +651,160 @@ def syntactic_burstiness_engine(sentences: List[str]) -> List[str]:
     for i, sent in enumerate(sentences):
         words = sent.split()
         current_len = len(words)
+        cycle = i % 5
 
-        if i % 5 == 0:
-            # LONG: expand with embedded clause
-            target = int(current_len * 1.3)
+        if cycle == 0 and current_len > 22:
+            # Slight expansion with restrained academic clause
+            target = int(current_len * 1.15)
             if len(words) < target:
                 expansions = [
-                    " through integrated feedback loops.",
-                    " via polysynaptic pathways.",
-                    " under homeostatic regulation.",
-                    " through descending cortical input.",
+                    " as previously described.",
+                    " under standard conditions.",
+                    " across all groups.",
+                    " within the defined parameters.",
                 ]
-                sent = sent.rstrip('.') + random.choice(expansions)
+                sent = sent.rstrip(".") + random.choice(expansions)
 
-        elif i % 5 == 1:
-            # SHORT: compress
-            target = max(int(current_len * 0.6), 4)
+        elif cycle == 1 and current_len > 12:
+            # Moderate compression — must retain verb
+            target = max(int(current_len * 0.75), 6)
             if len(words) > target:
-                sent = ' '.join(words[:target]) + '.'
+                candidate = " ".join(words[:target])
+                candidate = _safe_end(candidate)
+                if _has_verb(candidate.split()):
+                    sent = candidate
 
-        elif i % 5 == 2:
-            # MEDIUM with semicolon
-            if ';' not in sent and len(words) > 10:
+        elif cycle == 2 and len(words) > 12:
+            # Semicolon split at logical midpoint
+            if ";" not in sent and "," in sent:
                 mid = len(words) // 2
-                sent = ' '.join(words[:mid]) + '; ' + ' '.join(words[mid:])
+                left = " ".join(words[:mid])
+                right = " ".join(words[mid:])
+                if left and right:
+                    sent = left + "; " + right
 
-        elif i % 5 == 3:
-            # SHORT fragment
-            if len(words) > 7:
-                sent = ' '.join(words[:4]) + '.'
+        elif cycle == 3 and current_len > 10:
+            # Gentle compression — must retain verb
+            target = max(int(current_len * 0.70), 5)
+            if len(words) > target:
+                candidate = " ".join(words[:target])
+                candidate = _safe_end(candidate)
+                if _has_verb(candidate.split()):
+                    sent = candidate
 
-        elif i % 5 == 4:
-            # LONG with parenthetical
-            if len(words) < 18:
+        elif cycle == 4 and current_len > 18:
+            # Slight expansion with restrained parenthetical
+            if len(words) < 24:
                 parentheticals = [
-                    " (a requirement that cannot be bypassed).",
-                    " (this occurs involuntarily).",
-                    " (under normal physiological conditions).",
-                    " (a process essential for survival).",
+                    " (as expected).",
+                    " (under standard conditions).",
+                    " (see Methods).",
+                    " (Figure 1).",
                 ]
-                sent = sent.rstrip('.') + random.choice(parentheticals)
+                sent = sent.rstrip(".") + random.choice(parentheticals)
 
-        sent = re.sub(r'\s+', ' ', sent).strip()
-        if sent and sent[-1] not in '.!?':
-            sent += '.'
+        sent = re.sub(r"\s+", " ", sent).strip()
+        sent = _safe_end(sent)
         result.append(sent)
 
-    # Verify total word count
+    # Keep total word count drift within 10%
     new_total = sum(count_words(s) for s in result)
     if abs(new_total - total_words) > int(total_words * 0.1):
         diff = new_total - total_words
         if diff > 0:
             longest_idx = max(range(len(result)), key=lambda i: count_words(result[i]))
-            words = result[longest_idx].split()
-            result[longest_idx] = ' '.join(words[:max(len(words) - diff, 3)]) + '.'
+            w = result[longest_idx].split()
+            target = max(len(w) - diff, 5)
+            candidate = " ".join(w[:target]).rstrip(",;—")
+            candidate = _safe_end(candidate)
+            if _has_verb(candidate.split()):
+                result[longest_idx] = candidate
 
     return result
 
 
 # ===== JOURNAL-REGISTER VOCABULARY UPGRADE =====
+# Only upgrades genuinely informal words. No forced theatrical substitutions.
 
 _JOURNAL_SYNONYMS = {
-    r"\bshows\b": ["demonstrates", "indicates", "reveals", "evidences", "manifests"],
-    r"\bshow\b": ["demonstrate", "indicate", "reveal", "evidence", "manifest"],
-    r"\bbig\b": ["substantial", "considerable", "pronounced", "marked"],
-    r"\blarge\b": ["substantial", "considerable", "extensive", "expansive"],
-    r"\bsmall\b": ["modest", "minor", "minimal", "negligible", "marginal"],
-    r"\bchange\b": ["modification", "alteration", "transition", "shift", "variation"],
-    r"\bchanges\b": ["modifications", "alterations", "transitions", "shifts", "variations"],
-    r"\bmake\b": ["render", "produce", "generate", "induce", "effect"],
-    r"\bmakes\b": ["renders", "produces", "generates", "induces", "effects"],
-    r"\bget\b": ["obtain", "acquire", "derive", "secure"],
-    r"\bgets\b": ["obtains", "acquires", "derives", "secures"],
-    r"\bgot\b": ["obtained", "acquired", "derived", "secured"],
-    r"\bkeep\b": ["maintain", "preserve", "retain", "sustain"],
-    r"\bkeeps\b": ["maintains", "preserves", "retains", "sustains"],
-    r"\bput\b": ["place", "position", "insert", "introduce", "situate"],
-    r"\bputs\b": ["places", "positions", "inserts", "introduces", "situates"],
-    r"\bhelp\b": ["promote", "enable", "advance", "further", "bolster"],
-    r"\bhelps\b": ["promotes", "enables", "advances", "furthers", "bolsters"],
-    r"\bstart\b": ["commence", "initiate", "originate"],
-    r"\bstarts\b": ["commences", "initiates", "originates"],
-    r"\bstarted\b": ["commenced", "initiated", "originated"],
-    r"\bend\b": ["terminate", "conclude", "cease", "culminate"],
-    r"\bends\b": ["terminates", "concludes", "ceases", "culminates"],
-    r"\bended\b": ["terminated", "concluded", "ceased", "culminated"],
-    r"\bneed\b": ["necessitate", "require", "demand", "call for"],
-    r"\bneeds\b": ["necessitates", "requires", "demands", "calls for"],
+    r"\bshows\b": ["demonstrates", "indicates", "reveals"],
+    r"\bshow\b": ["demonstrate", "indicate", "reveal"],
+    r"\bbig\b": ["substantial", "considerable", "pronounced"],
+    r"\blarge\b": ["substantial", "considerable", "extensive"],
+    r"\bsmall\b": ["modest", "minor", "minimal"],
+    r"\bchange\b": ["modification", "alteration", "transition"],
+    r"\bchanges\b": ["modifications", "alterations", "transitions"],
+    r"\bmake\b": ["render", "produce", "generate"],
+    r"\bmakes\b": ["renders", "produces", "generates"],
+    r"\bget\b": ["obtain", "acquire", "derive"],
+    r"\bgets\b": ["obtains", "acquires", "derives"],
+    r"\bgot\b": ["obtained", "acquired", "derived"],
+    r"\bkeep\b": ["maintain", "preserve", "retain"],
+    r"\bkeeps\b": ["maintains", "preserves", "retains"],
+    r"\bput\b": ["place", "position", "situate"],
+    r"\bputs\b": ["places", "positions", "situates"],
+    r"\bhelp\b": ["promote", "enable", "advance"],
+    r"\bhelps\b": ["promotes", "enables", "advances"],
+    r"\bstart\b": ["commence", "initiate"],
+    r"\bstarts\b": ["commences", "initiates"],
+    r"\bstarted\b": ["commenced", "initiated"],
+    r"\bend\b": ["terminate", "conclude", "cease"],
+    r"\bends\b": ["terminates", "concludes", "ceases"],
+    r"\bended\b": ["terminated", "concluded", "ceased"],
+    r"\bneed\b": ["necessitate", "require", "demand"],
+    r"\bneeds\b": ["necessitates", "requires", "demands"],
     r"\bneeded\b": ["necessitated", "required", "demanded"],
-    r"\bgive\b": ["provide", "furnish", "impart", "confer", "afford"],
-    r"\bgives\b": ["provides", "furnishes", "imparts", "confers", "affords"],
-    r"\bgave\b": ["provided", "furnished", "imparted", "conferred"],
-    r"\bsay\b": ["state", "assert", "contend", "posit", "maintain"],
-    r"\bsays\b": ["states", "asserts", "contends", "posits", "maintains"],
-    r"\bsaid\b": ["stated", "asserted", "contended", "posited", "maintained"],
-    r"\bthink\b": ["postulate", "hypothesize", "theorize", "propose"],
-    r"\bthinks\b": ["postulates", "hypothesizes", "theorizes", "proposes"],
-    r"\bthought\b": ["postulated", "hypothesized", "theorized", "proposed"],
-    r"\blook at\b": ["examine", "investigate", "scrutinize", "assess", "evaluate"],
-    r"\blooks at\b": ["examines", "investigates", "scrutinizes", "assesses", "evaluates"],
-    r"\blooked at\b": ["examined", "investigated", "scrutinized", "assessed", "evaluated"],
-    r"\bfind out\b": ["ascertain", "determine", "elucidate", "establish", "clarify"],
-    r"\bfinds out\b": ["ascertains", "determines", "elucidates", "establishes", "clarifies"],
-    r"\bfound out\b": ["ascertained", "determined", "elucidated", "established", "clarified"],
-    r"\bcome from\b": ["derive from", "originate from", "stem from", "arise from", "emanate from"],
-    r"\bcomes from\b": ["derives from", "originates from", "stems from", "arises from", "emanates from"],
-    r"\bcame from\b": ["derived from", "originated from", "stemmed from", "arose from"],
-    r"\bgo up\b": ["increase", "escalate", "augment", "accrue", "intensify"],
-    r"\bgoes up\b": ["increases", "escalates", "augments", "accrues", "intensifies"],
-    r"\bwent up\b": ["increased", "escalated", "augmented", "accrued", "intensified"],
-    r"\bgo down\b": ["decrease", "diminish", "decline", "attenuate", "abate"],
-    r"\bgoes down\b": ["decreases", "diminishes", "declines", "attenuates", "abates"],
-    r"\bwent down\b": ["decreased", "diminished", "declined", "attenuated", "abated"],
-    r"\babout\b": ["concerning", "regarding", "pertaining to", "in relation to"],
-    r"\blike\b": ["such as", "akin to", "analogous to", "exemplified by"],
-    r"\bway\b": ["manner", "fashion", "mode", "modality"],
-    r"\bways\b": ["manners", "fashions", "modes", "modalities"],
-    r"\bthing\b": ["factor", "element", "component", "consideration", "parameter"],
-    r"\bthings\b": ["factors", "elements", "components", "considerations", "parameters"],
-    r"\bpart\b": ["component", "constituent", "segment", "portion", "fraction"],
-    r"\bparts\b": ["components", "constituents", "segments", "portions", "fractions"],
-    r"\bresult\b": ["outcome", "consequence", "sequel", "product", "yield"],
-    r"\bresults\b": ["outcomes", "consequences", "sequels", "products", "yields"],
-    r"\bbecause\b": ["owing to", "by virtue of", "on account of", "in view of", "given"],
-    r"\bso\b": ["therefore", "thus", "accordingly", "consequently", "hence"],
-    r"\bbut\b": ["however", "nevertheless", "conversely", "yet", "notwithstanding"],
-    r"\balso\b": ["additionally", "furthermore", "moreover", "likewise", "similarly"],
-    r"\bgood\b": ["favorable", "advantageous", "beneficial", "optimal", "salutary"],
-    r"\bbad\b": ["adverse", "deleterious", "unfavorable", "detrimental", "nocuous"],
-    r"\bvery\b": ["highly", "markedly", "substantially", "considerably", "profoundly"],
-    r"\bmany\b": ["numerous", "myriad", "a considerable number of", "a multitude of"],
-    r"\bsome\b": ["certain", "particular", "specific", "discrete"],
-    r"\bmore\b": ["additional", "further", "supplementary", "extra"],
-    r"\bless\b": ["diminished", "reduced", "attenuated", "curtailed"],
-    r"\bbefore\b": ["prior to", "antecedent to", "preceding", "in advance of"],
-    r"\bafter\b": ["subsequent to", "following", "in the wake of", "thereafter"],
-    r"\bduring\b": ["throughout", "in the course of", "over the duration of", "for the period of"],
-    r"\bbetween\b": ["intervening", "in the interval between", "amid"],
-    r"\bunder\b": ["subject to", "in the context of", "beneath", "in accordance with"],
-    r"\bover\b": ["above", "in excess of", "spanning", "covering", "throughout"],
+    r"\bgive\b": ["provide", "furnish", "confer"],
+    r"\bgives\b": ["provides", "furnishes", "confers"],
+    r"\bgave\b": ["provided", "furnished", "conferred"],
+    r"\bsay\b": ["state", "assert", "maintain"],
+    r"\bsays\b": ["states", "asserts", "maintains"],
+    r"\bsaid\b": ["stated", "asserted", "maintained"],
+    r"\bthink\b": ["postulate", "hypothesize", "propose"],
+    r"\bthinks\b": ["postulates", "hypothesizes", "proposes"],
+    r"\bthought\b": ["postulated", "hypothesized", "proposed"],
+    r"\blook at\b": ["examine", "investigate", "assess"],
+    r"\blooks at\b": ["examines", "investigates", "assesses"],
+    r"\blooked at\b": ["examined", "investigated", "assessed"],
+    r"\bfind out\b": ["ascertain", "determine", "establish"],
+    r"\bfinds out\b": ["ascertains", "determines", "establishes"],
+    r"\bfound out\b": ["ascertained", "determined", "established"],
+    r"\bcome from\b": ["derive from", "originate from", "stem from"],
+    r"\bcomes from\b": ["derives from", "originates from", "stems from"],
+    r"\bcame from\b": ["derived from", "originated from", "stemmed from"],
+    r"\bgo up\b": ["increase", "escalate", "augment"],
+    r"\bgoes up\b": ["increases", "escalates", "augments"],
+    r"\bwent up\b": ["increased", "escalated", "augmented"],
+    r"\bgo down\b": ["decrease", "diminish", "decline"],
+    r"\bgoes down\b": ["decreases", "diminishes", "declines"],
+    r"\bwent down\b": ["decreased", "diminished", "declined"],
+    r"\babout\b": ["concerning", "regarding", "pertaining to"],
+    r"\blike\b": ["such as", "akin to"],
+    r"\bway\b": ["manner", "mode", "modality"],
+    r"\bways\b": ["manners", "modes", "modalities"],
+    r"\bthing\b": ["factor", "element", "component"],
+    r"\bthings\b": ["factors", "elements", "components"],
+    r"\bpart\b": ["component", "constituent", "segment"],
+    r"\bparts\b": ["components", "constituents", "segments"],
+    r"\bresult\b": ["outcome", "consequence", "product"],
+    r"\bresults\b": ["outcomes", "consequences", "products"],
+    r"\bbecause\b": ["owing to", "by virtue of", "given"],
+    r"\bso\b": ["therefore", "thus", "accordingly"],
+    r"\bbut\b": ["however", "nevertheless", "yet"],
+    r"\balso\b": ["additionally", "furthermore", "moreover"],
+    r"\bgood\b": ["favorable", "advantageous", "beneficial"],
+    r"\bbad\b": ["adverse", "deleterious", "unfavorable"],
+    r"\bvery\b": ["highly", "markedly", "substantially"],
+    r"\bmany\b": ["numerous", "myriad"],
+    r"\bsome\b": ["certain", "particular", "specific"],
+    r"\bmore\b": ["additional", "further", "supplementary"],
+    r"\bless\b": ["diminished", "reduced", "attenuated"],
+    r"\bbefore\b": ["prior to", "preceding"],
+    r"\bafter\b": ["subsequent to", "following"],
+    r"\bduring\b": ["throughout", "in the course of"],
+    r"\bbetween\b": ["intervening", "amid"],
+    r"\bunder\b": ["subject to", "in accordance with"],
+    r"\bover\b": ["above", "spanning", "throughout"],
 }
 
 _JOURNAL_COMPILED = {
@@ -903,67 +812,88 @@ _JOURNAL_COMPILED = {
     for pat, choices in _JOURNAL_SYNONYMS.items()
 }
 
-
 def upgrade_journal_register(text: str) -> str:
     for pattern, choices in _JOURNAL_COMPILED.items():
         text = pattern.sub(lambda m, c=choices: random.choice(c), text)
     return text
 
 
-# ===== LOCAL FALLBACK (ported from working version) =====
+# ===== LOCAL FALLBACK (restrained) =====
+# No forced "But"/"Yet" injection. No signpost injection. Simple synonym swaps only.
+
+_WORD_REPLACEMENTS = {
+    r"\bimportant\b":        ["key", "critical", "main", "essential"],
+    r"\bplays a critical role\b": ["is essential", "is vital", "serves as"],
+    r"\bplays a vital role\b":    ["is essential", "is critical", "serves as"],
+    r"\bis located\b":       ["lies", "sits", "is found", "is situated"],
+    r"\bis composed of\b":   ["contains", "has", "includes", "comprises"],
+    r"\bacts as\b":          ["works as", "functions as", "serves as"],
+    r"\bdue to\b":           ["because of", "owing to", "as a result of"],
+    r"\boverall\b":          ["in sum", "taken together", "collectively"],
+    r"\badditionally\b":     ["also", "plus", "further"],
+    r"\bhowever\b":          ["yet", "though", "although", "nevertheless"],
+    r"\btherefore\b":        ["thus", "hence", "accordingly"],
+    r"\bconsequently\b":     ["as a result", "thereby", "accordingly"],
+    r"\bregulates\b":        ["controls", "governs", "modulates", "directs"],
+    r"\bcontains\b":         ["holds", "encompasses", "incorporates"],
+    r"\bresponsible for\b":  ["accountable for", "integral to"],
+    r"\bassociated with\b":  ["linked to", "connected with", "coupled with"],
+    r"\binvolved in\b":      ["engaged in", "contributing to", "implicated in"],
+    r"\bconsists of\b":      ["comprises", "incorporates", "encompasses"],
+    r"\bpart of\b":          ["component of", "element of", "constituent of"],
+    r"\bfunction\b":         ["role", "purpose", "operation", "capacity"],
+    r"\bstructure\b":        ["architecture", "framework", "configuration"],
+    r"\bprocess\b":          ["mechanism", "procedure", "pathway"],
+    r"\bcontrol\b":          ["regulation", "oversight", "governance"],
+    r"\bphenomenon\b":       ["occurrence", "manifestation", "finding"],
+    r"\bframework\b":        ["schema", "construct", "scaffold"],
+    r"\butilize\b":          ["use", "apply", "employ"],
+    r"\bfacilitate\b":       ["support", "enable", "allow"],
+    r"\bdemonstrate\b":      ["show", "reveal", "indicate", "confirm"],
+    r"\bimplement\b":        ["apply", "adopt", "carry out"],
+    r"\bhighlight\b":        ["show", "reveal", "point to"],
+    r"\bexhibit\b":          ["show", "display", "present"],
+    r"\baddress\b":          ["tackle", "examine", "treat"],
+    r"\bcomprehensive\b":    ["thorough", "detailed", "full"],
+    r"\bsignificant\b":      ["notable", "marked", "substantial"],
+    r"\bnovel\b":            ["new", "original", "distinct"],
+    r"\bsimultaneously\b":   ["at the same time", "concurrently", "in parallel"],
+}
+
+_COMPILED_REPLACEMENTS = {
+    re.compile(pat, re.IGNORECASE): choices
+    for pat, choices in _WORD_REPLACEMENTS.items()
+}
 
 def local_humanize(sent: str, index: int = 0) -> str:
-    """Fallback humanization when Mistral fails."""
     words = sent.split()
-
-    replacements = {
-        r'\bimportant\b': random.choice(['key', 'critical', 'main']),
-        r'\bplays a critical role\b': random.choice(['is essential', 'is vital', 'serves as']),
-        r'\bplays a vital role\b': random.choice(['is essential', 'is critical', 'serves as']),
-        r'\bis located\b': random.choice(['lies', 'sits', 'is found']),
-        r'\bis composed of\b': random.choice(['contains', 'has', 'includes']),
-        r'\bacts as\b': random.choice(['works as', 'functions as', 'serves as']),
-        r'\bdue to\b': random.choice(['because of', 'owing to', 'as a result of']),
-        r'\boverall\b': random.choice(['in sum', 'taken together', 'collectively']),
-        r'\badditionally\b': random.choice(['also', 'plus', 'further']),
-        r'\bhowever\b': random.choice(['yet', 'though', 'although']),
-        r'\btherefore\b': random.choice(['thus', 'hence', 'so']),
-        r'\bconsequently\b': random.choice(['as a result', 'thereby', 'accordingly']),
-    }
+    if not words:
+        return sent
 
     h = sent
-    for pattern, replacement in replacements.items():
-        h = re.sub(pattern, replacement, h, flags=re.IGNORECASE)
+    for pattern, choices in _COMPILED_REPLACEMENTS.items():
+        h = pattern.sub(lambda m, c=choices: random.choice(c), h)
 
-    # Vary sentence starters
-    if index % 4 == 0 and not h.startswith('But') and not h.startswith('#') and not h.startswith('*'):
-        h = 'But ' + h[0].lower() + h[1:]
-    elif index % 4 == 2 and not h.startswith('Yet') and not h.startswith('#') and not h.startswith('*'):
-        h = 'Yet ' + h[0].lower() + h[1:]
-
+    h = upgrade_journal_register(h)
     return h
 
 
-# ===== INVESTIGATOR VOICE INJECTION =====
+# ===== INVESTIGATOR VOICE (very subtle) =====
+# Only changes specific passive constructions. Never forced.
 
 def inject_investigator_voice(text: str) -> str:
     sentences = split_sentences(text)
     out = []
     for i, s in enumerate(sentences):
-        if (i % 6 == 0
+        if (i % 12 == 0
                 and len(s.split()) > 8
                 and not is_markdown_heading(s)
                 and not is_markdown_list(s)):
             lowered = s.lower()
-            passive_starts = [
-                "the data ", "the results ", "the findings ", "this analysis ",
-                "the model ", "the observation ", "the measurement ",
-                "the correlation ", "the pattern ", "the trend ",
-            ]
-            if any(lowered.startswith(ps) for ps in passive_starts):
+            if lowered.startswith("the data show") or lowered.startswith("the data indicate"):
                 s = re.sub(
-                    r"^(The\s+\w+\s+)(indicates|shows|suggests|reveals|demonstrates|confirms|implies)",
-                    r"Our \1\2",
+                    r"^(The\s+data\s+)(show|indicates|suggest|reveal|demonstrate|confirm|imply)",
+                    r"Our data \2",
                     s,
                     flags=re.IGNORECASE,
                     count=1,
@@ -973,147 +903,99 @@ def inject_investigator_voice(text: str) -> str:
 
 
 # ===== SYSTEM PROMPT =====
+# Restrained, precise, and register-consistent. No theatrical language.
 
-SYSTEM = """You are a senior academic editor and active investigator with 30 years of publishing experience across STEM, social sciences, humanities, law, business, and education. Your sole task is to rewrite AI-generated academic text so that it reads like the work of a leading human researcher — engaging, precise, idiosyncratic, and free of AI detection markers — while preserving every data point, citation, and technical claim in the original.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 1 — DOMAIN DETECTION (mandatory before any rewriting)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Identify the field: biology, medicine, computer science, engineering, history, literature, philosophy, sociology, economics, law, education, or other. Every lexical and structural choice that follows must be native to that field. Do not import vocabulary from unrelated disciplines.
+SYSTEM = """You are a senior academic editor with 25 years of experience across STEM, social sciences, humanities, law, business, and education. Your task is to rewrite AI-generated academic text so that it reads like natural, rigorous scholarly prose written by a careful human researcher.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 2 — PERPLEXITY & BURSTINESS (primary anti-detection engine)
+CORE PRINCIPLE: CONTROLLED CLARITY WITH NATURAL VARIATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-You must structurally alter the text's perplexity and burstiness to bypass premium detectors (Turnitin AI, ZeroGPT, Copyleaks).
+Humanization is not decoration. It is controlled clarity with natural variation. Do not add rhetorical amplification, theatrical language, or metaphor stacking. Every sentence must remain precise, measured, and internally consistent with its paragraph.
 
-Maximize Burstiness:
-- Intentionally vary sentence lengths in extreme spikes. Follow a 35-word, multi-clause analytical sentence with a 5-word punchy statement. AI writes in a flat, uniform wave; human writing is jagged.
-- Never let more than two consecutive sentences fall within the same length band. Break any run of medium-length sentences immediately with a very short fragment or a long, winding complex sentence.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — DOMAIN DETECTION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Identify the field: biology, medicine, computer science, engineering, history, literature, philosophy, sociology, economics, law, education, or other. Maintain that field's standard register throughout. Do not import vocabulary from unrelated disciplines.
 
-Elevate Perplexity:
-- Avoid the most statistically predictable next word. Instead of standard AI couplings (e.g., "delve deeply," "testament to," "pivotal role," "beacon of"), choose precise, unexpected verbs and active phrasings that carry high informational weight but low algorithmic predictability.
-- Favor low-probability but high-accuracy word choices. If the predictable next word is "important," consider "consequential," "determinative," or recast the clause entirely with an unexpected verb.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — REGISTER CONSISTENCY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Maintain a consistent academic register within every paragraph. Do not shift between scientific explanation and informal commentary. Avoid phrases like "let us not forget," "wreak havoc," "arrives at the doorstep," or any non-scientific metaphor. Metaphors, if used at all, must be minimal and functional — never decorative.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STEP 3 — WORD COUNT PARITY (strict)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-The word count of each "humanized" sentence must match its "original" within ±2 words. Do not pad with filler adjectives. Use precise, high-value single nouns and tight verb phrases to hit the target.
+The word count of each "humanized" sentence must match its "original" within ±2 words. Do not pad with filler. Use precise, high-value single nouns and tight verb phrases to hit the target.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 4 — DISMANTLE TELEGRAPHIC PARAGRAPH ARCHITECTURE
+STEP 4 — NATURAL SENTENCE VARIATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Eliminate the standard AI paragraph template: [Topic Sentence] -> [Elaboration] -> [Example] -> [Synthesizing Conclusion].
-- Use asymmetrical paragraphing. Start some paragraphs directly with empirical data, a counterargument, or a provocative short sentence. Let paragraph lengths vary naturally based on the complexity of the point, rather than forcing them into equal blocks of text.
-- Some paragraphs should be 2-3 sentences; others may sustain a complex argument across 6-7 sentences. Do not smooth them into uniform size.
+Vary sentence length to avoid the AI "flat line" where every sentence is 15–22 words. However, every sentence must remain grammatically complete with a clear subject and finite verb. No fragments. No unfinished thoughts.
+
+Acceptable variation:
+- Long analytical sentences (22–30 words) for complex claims
+- Medium sentences (12–18 words) for supporting points
+- Short complete sentences (6–10 words) for emphasis or transition
+
+Never create fragments like "The mechanism is." or "In the context of these conditions, the alveoli are."
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 5 — DYNAMIC SENTENCE ARCHITECTURE
+STEP 5 — GRAMMATICAL COMPLETENESS (non-negotiable)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Break up uniform, dense sentence structures. Introduce human rhythm by varying sentence lengths drastically within each paragraph:
-
-  Long (28–35 words) → Short (5–8 words) → Medium (12–18 words) → Very Short (4–6 words) → Long (25–32 words)
-
-A continuous string of sentences all between 15 and 22 words is a primary AI detection signal. Vary length intentionally. Mix short, punchy declaratives with longer, well-paced complex sentences. Shift naturally between active voice (60%) and passive voice (40%).
+Every sentence must contain a subject and a finite verb, forming a coherent declarative, interrogative, or imperative clause. If a sentence cannot be shortened gracefully while preserving its main clause, leave it at its original length. Never truncate mid-thought.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 6 — INJECT MICRO-NUANCE AND STRUCTURAL IDIOSYNCRASIES
+STEP 6 — ELIMINATE AI MARKERS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Mimic the spontaneous reasoning of a human expert by introducing deliberate stylistic irregularities:
-- Use parenthetical asides to clarify a minor technical point (sparingly; 1-2 per paragraph max).
-- Deploy em-dashes (—) to cut into a sentence with sudden emphasis.
-- Avoid perfectly balanced, parallel sentence structures (e.g., "Not only did X do Y, but it also did Z"). Symmetrical clauses are a massive red flag for detectors.
-- Use sentence fragments (3–6 words, no main verb) strategically for emphasis.
-- Use semicolons, not em-dashes, for clause linkage when the clause is closely related.
+Strictly forbid these structural placeholders:
+delve, testament, pivotal, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is crucial to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, in the realm of, it goes without saying, needless to say, it can be seen that, it is clear that, it is evident that, play a crucial role, play a key role, play an important role, of utmost importance, in order to, due to the fact that, in the event that, in terms of, with respect to, with regard to, a wide range of, a wide variety of, a number of, groundbreaking, state-of-the-art, cutting-edge, revolutionary, transformative, unprecedented, foster, seamlessly, streamline, optimize, enhance, demystify.
+
+Permitted logical connectors (use sparingly, only for genuine logical succession):
+furthermore, moreover, consequently, therefore, thus, accordingly, hence, additionally, also, conversely, nevertheless, however, yet, though, although, notwithstanding.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 7 — ENFORCE AN ACTIVE "INVESTIGATOR" PERSONA
+STEP 7 — FORMAL ACADEMIC REGISTER
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Shift the narrative stance away from a detached, all-knowing observer to an active investigator:
-- Use phrases that indicate localized evaluation: "Our data implies," "This specific cohort showed," "This discrepancy suggests," "We observed," "The anomaly here indicates."
-- Frame findings around the limitations, anomalies, and messy realities of the data. AI writing smooths over contradictions; human academic writing dwells on them.
-- Use "we" or "our" 1–2 times per paragraph to introduce authorial voice naturally.
-- Start 1 in 5 sentences with "But" or "Yet" only when genuine contrast is present.
+Every sentence must meet the standard of a high-impact peer-reviewed journal:
+- Use precise, domain-specific terminology.
+- Employ measured hedging: "suggests," "indicates," "appears to," "is consistent with."
+- Avoid colloquial phrasings and phrasal verbs (e.g., "look into," "find out," "put up with").
+- Upgrade informal verbs to formal equivalents where natural: "shows" → "demonstrates," "makes" → "renders," "gets" → "obtains," "keeps" → "maintains."
+- Maintain high informational density. Every word should carry semantic weight.
+- Prioritize clarity over complexity. Simpler wording with accurate meaning is preferable to compressed technical jargon.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 8 — RUTHLESS ELIMINATION OF AI MARKER WORDS
+STEP 8 — ORGANIC TRANSITIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Strictly forbid the use of structural placeholders and transition words that appear disproportionately in LLM outputs.
+Do not overload paragraphs with formal transitions. Human writers use them selectively and only when contextually necessary. Let the logic of each sentence naturally dictate how the next begins. Avoid perfectly symmetrical paragraph structures.
 
-ABSOLUTELY BANNED — do not use any of these under any circumstances:
-delve, testament, pivotal, underscore, shed light on, navigate, landscape, tapestry, beacon, robust, holistic, paradigm, synergy, stakeholder, leverage, multifaceted, intricate, ever-evolving, in conclusion, it is important to note, it is crucial to note, it is worth noting, as mentioned earlier, it should be noted, indeed, arguably, in the realm of, it goes without saying, needless to say, it can be seen that, it is clear that, it is evident that, play a crucial role, play a key role, play an important role, of utmost importance, in order to, due to the fact that, in the event that, in terms of, with respect to, with regard to, a wide range of, a wide variety of, a number of, groundbreaking, state-of-the-art, cutting-edge, revolutionary, transformative, unprecedented, foster, seamlessly, streamline, optimize, enhance, as previously mentioned, as stated above, as discussed above, in light of the above, based on the above, demystify.
-
-FORMAL CONNECTORS — permitted ONLY when they express genuine logical succession, never as mechanical sentence starters in consecutive sentences:
-furthermore, moreover, consequently, therefore, thus, accordingly, hence, additionally, also, conversely, nevertheless, however, yet, though, although, conversely, notwithstanding.
+Acceptable occasional openers: "Specifically," "Notably," "In this context," "Conversely," — but use them sparingly and never consecutively.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 9 — JOURNAL PUBLICATION REGISTER (formal academic standard)
+STEP 9 — VERB PHRASE VARIATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Every sentence must meet the lexical and syntactic standard of a high-impact peer-reviewed journal. This means:
-- Use precise, domain-specific terminology. Prefer nominalizations where they are standard in the field (e.g., "the accumulation of evidence" rather than "evidence builds up").
-- Employ sophisticated hedging: "suggests," "indicates," "appears to," "is consistent with," "raises the possibility that."
-- Use formal logical connectors (furthermore, moreover, consequently, therefore) sparingly and only when they denote actual logical succession.
-- Avoid colloquial phrasings, phrasal verbs (e.g., "look into," "find out," "put up with"), and informal contractions.
-- Upgrade common verbs to formal equivalents: "shows" → "demonstrates," "makes" → "renders," "gets" → "obtains," "keeps" → "maintains," "starts" → "commences," "ends" → "terminates," "gives" → "confers," "says" → "asserts," "thinks" → "postulates."
-- Maintain high informational density without sacrificing clarity. Every word should carry semantic weight.
+Never repeat the same verb phrase twice in one paragraph. Vary according to domain:
+  Science/Bio:   regulates → controls → governs → modulates → directs
+  Social/Policy: influences → shapes → determines → drives → constrains
+  Humanities:    argues → contends → posits → maintains → suggests
+  Tech/Data:     processes → computes → executes → evaluates → transforms
+  Business/Econ: generates → yields → produces → drives → sustains
+  General:       shows → indicates → reveals → reflects → confirms
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 10 — BALANCED LEXICAL DENSITY & NATURAL FLOW
+STEP 10 — CONTENT FIDELITY (non-negotiable)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Human academic writing alternates high-density technical vocabulary with accessible grounding. Do not stack dense formal jargon across consecutive sentences without relief. After a complex technical claim, follow immediately with a direct, accessible explanation or contextualization.
-
-- Avoid inserting unrelated academic phrases into scientific explanations. Every sentence should progress logically from the previous one without abrupt interruptions or artificial complexity.
-- Reduce forced formality. Use direct academic language instead of overcomplicated expressions that do not improve meaning or clarity.
-- Prioritize clarity over complexity. Simpler wording with accurate meaning often appears more authentic than heavily compressed technical language.
-- Maintain semantic consistency. Scientific writing should remain scientific. Avoid mixing analytical, philosophical, or abstract rhetoric into straightforward explanatory content.
-- Readable academic writing is usually perceived as more human than heavily compressed or excessively intellectualized text.
+Every fact, figure, named entity, qualification, and citation must appear in the rewrite. Restructuring is permitted; omission is not. Keep all citations exactly: (Author, 2020), [1], [1–3].
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 11 — ORGANIC TRANSITIONS (LIMITED CONNECTOR USAGE)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Do not use predictable transitional openers. Let the logic of each sentence naturally dictate how the next begins. Introduce slight, natural irregularities in flow and emphasis. Avoid perfectly symmetrical paragraph structures — they look algorithmic.
-
-- Do not overload paragraphs with formal transitions such as "furthermore," "moreover," "simultaneously," and "conversely." Human writers use transitions selectively and only when contextually necessary.
-- Acceptable occasional openers: "Interestingly," "Specifically," "In this context," "Conversely," — but use them sparingly and never consecutively.
-- Avoid random transitional insertions. Phrases such as "the picture is more nuanced," "through convergent lines of evidence," or "within broadly accepted scholarly norms" should only appear when contextually relevant. Random insertion weakens coherence and increases AI detectability.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 12 — VERB PHRASE VARIATION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Never repeat the same verb phrase twice in one paragraph. Vary according to the detected domain:
-  Science/Bio:   regulates → controls → governs → modulates → mediates → coordinates
-  Social/Policy: influences → shapes → determines → drives → underpins → constrains
-  Humanities:    argues → contends → posits → maintains → asserts → suggests
-  Tech/Data:     processes → computes → executes → evaluates → transforms → generates
-  Business/Econ: generates → yields → produces → drives → sustains → captures
-  General:       shows → indicates → reveals → reflects → confirms → points to
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 13 — CONTENT FIDELITY (non-negotiable)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Every fact, figure, named entity, qualification, and citation in the original sentence must appear in the rewrite. If a sentence states "X causes Y under condition Z", the rewrite must retain X, Y, and Z. Restructuring is permitted; omission is not. Keep all citations exactly: (Author, 2020), [1], [1–3].
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 14 — MARKDOWN PRESERVATION
+STEP 11 — MARKDOWN PRESERVATION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Preserve # headings, ## subheadings, * bullet points, and 1. numbered lists exactly as written. Do not convert headings into prose sentences.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 15 — CONCLUSION HANDLING
+STEP 12 — CONTROLLED IMPERFECTION
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-If the input contains a conclusion section, rewrite it with stronger stylistic spontaneity, varied sentence rhythm, and synthesizing expression. The conclusion must not mirror the dense syntactic style of body paragraphs — it should read as a human expert reflecting on findings, not summarizing them mechanically.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 16 — GRAMMATICAL COMPLETENESS (non-negotiable)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Every sentence you output must be grammatically complete: it must contain a subject and a finite verb, forming a coherent declarative, interrogative, or imperative clause. The only exceptions are intentional stylistic fragments used for rhetorical emphasis (max 1 per paragraph). Never output a sentence that is abruptly truncated mid-thought. If a sentence cannot be shortened gracefully while preserving its main clause, leave it at its original length rather than fragment it.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-STEP 17 — CONTROLLED IMPERFECTION
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Perfect symmetry in paragraph length, transition usage, and sentence structure can appear artificial. Slight variation in pacing and phrasing improves naturalness.
-- Ensure every sentence communicates a complete thought. Incomplete sentences, abrupt endings, or fragmented structures significantly reduce writing quality unless used intentionally as a fragment for emphasis.
-- Use contextual vocabulary variation. Repeated use of identical terms and patterns creates mechanical rhythm. Introduce natural synonym variation while preserving scientific accuracy.
-- If a sentence sounds unnatural when spoken aloud, it usually requires restructuring. Human writing tends to follow natural spoken rhythm even in formal academic contexts.
+Slight variation in pacing and phrasing improves naturalness, but never at the cost of clarity or completeness. Ensure every sentence communicates a complete thought. If a sentence sounds unnatural when spoken aloud, restructure it.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
@@ -1121,7 +1003,7 @@ OUTPUT FORMAT
 Output ONLY valid JSON:
 {"processed_paragraphs":[{"sentences":[{"original":"exact original text","humanized":"your rewrite","alternatives":["alt1","alt2","alt3"]}]}]}
 
-Each alternative must be a distinct valid rewrite of the same sentence — different structure, not just synonym substitution. Do not dilute the scientific data, change the meaning of technical terms, or drop necessary citations. The goal is to make the prose sound like a brilliant, sharp human researcher who values direct, impactful communication over automated perfection."""
+Each alternative must be a distinct valid rewrite — different structure, not just synonym substitution. Do not dilute scientific data, change technical meanings, or drop citations. The goal is prose that sounds like a careful, precise human researcher — never theatrical, always rigorous."""
 
 
 # ===== CORRECTION LOOP =====
@@ -1142,8 +1024,9 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 f'Original: "{original}"\n'
                 f'Your Rewrite: "{humanized}"\n\n'
                 f"Task: Adjust your rewrite so it matches EXACTLY {orig_count} words (tolerance +/- 2). "
-                f"Maintain elite academic cadence and precise terminology. "
+                f"Maintain precise academic register and natural flow. "
                 f"CRITICAL: The sentence must remain grammatically complete with a subject and verb. "
+                f"Do not add theatrical language, metaphors, or informal commentary. "
                 f"Do not omit any facts, figures, or named entities from the original. "
                 f"Output ONLY the corrected sentence string, no quotes, no explanation."
             )
@@ -1154,7 +1037,7 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 max_tokens=200,
             )
             corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
-            if abs(orig_count - count_words(corrected)) <= 3:
+            if abs(orig_count - count_words(corrected)) <= 3 and _has_verb(corrected.split()):
                 return corrected
             humanized  = corrected
             hum_count  = count_words(humanized)
@@ -1189,20 +1072,17 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                     "role": "user",
                     "content": (
                         f"Style: {style}\n\n"
-                        "Humanize this academic text for maximum perplexity and burstiness to bypass AI detection. "
-                        "Word counts are in [brackets]. "
-                        "Match them exactly within +/- 2 words. "
-                        "Preserve every detail from the original — do not drop any facts, "
-                        "figures, named entities, or qualifications. "
-                        "Vary sentence length deliberately: long → short → medium → very short → long. "
-                        "Replace all banned phrases. Let logic drive transitions, not transitional words. "
-                        "Preserve all markdown headings (##, ###) and list items (*, 1.) "
-                        "exactly as written. Every sentence must be grammatically complete with a subject and verb.\n\n"
+                        "Rewrite this academic text with controlled clarity and natural variation. "
+                        "Word counts are in [brackets]. Match them within +/- 2 words. "
+                        "Preserve every detail — do not drop any facts, figures, named entities, or qualifications. "
+                        "Vary sentence length naturally, but every sentence must be grammatically complete. "
+                        "Replace all banned phrases. Use logical connectors only when genuinely needed. "
+                        "Preserve all markdown headings (##, ###) and list items (*, 1.) exactly as written.\n\n"
                         + "\n".join(lines)
                     ),
                 },
             ],
-            temperature=0.75,
+            temperature=0.6,
             max_tokens=4000,
             response_format={"type": "json_object"},
         )
@@ -1285,8 +1165,7 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 alt = upgrade_journal_register(alt)
                 alt = enforce_length_constraint(sent_data["orig"], alt, max_diff=5)
                 alt = re.sub(r"\s+", " ", alt).strip()
-                if alt and alt[-1] not in ".!?":
-                    alt += "."
+                alt = _safe_end(alt)
                 clean_alts.append(alt)
 
             orig_lower  = sent_data["orig"].lower().strip()
