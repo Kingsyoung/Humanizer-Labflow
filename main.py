@@ -2,6 +2,8 @@ import os
 import re
 import json
 import random
+import time
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,7 +17,11 @@ if not API_KEY:
     print("ERROR: No API key. Set MISTRAL_API_KEY environment variable.")
     exit(1)
 
-client = Mistral(api_key=API_KEY)
+print(f"Mistral API Key loaded: {API_KEY[:8]}...")
+
+# ===== HTTP CLIENT WITH TIMEOUT =====
+_http_client = httpx.Client(timeout=60.0, follow_redirects=True)
+client = Mistral(api_key=API_KEY, client=_http_client)
 
 app = FastAPI(title="Academic Humanizer")
 app.add_middleware(
@@ -198,6 +204,11 @@ def count_words(text: str) -> int:
     return len(text.split())
 
 
+def estimate_tokens(text: str) -> int:
+    """Rough estimate: ~1.3 tokens per word for English."""
+    return int(len(text.split()) * 1.3)
+
+
 # ===== GRAMMATICAL SAFETY =====
 
 _COMMON_VERBS = {
@@ -240,7 +251,7 @@ def _safe_end(text: str) -> str:
     return text
 
 
-# ===== LENGTH ENFORCEMENT (minimal) =====
+# ===== LENGTH ENFORCEMENT =====
 
 def enforce_length_constraint(original: str, humanized: str, max_diff: int = 4) -> str:
     orig_count = count_words(original)
@@ -298,9 +309,6 @@ def eliminate_repetition(text: str) -> str:
 
 
 # ===== NATURAL HUMAN VARIATION ENGINE =====
-# This is the core anti-detection layer. It introduces genuine human statistical
-# patterns: contractions, slight informality, varied sentence rhythm, and
-# unpredictable phrasing that breaks AI token predictability.
 
 _CONTRACTIONS = {
     "do not": "don't",
@@ -353,19 +361,16 @@ _CONTRACTIONS = {
     "might have": "might've",
 }
 
-def apply_contractions(text: str, rate: float = 0.15) -> str:
-    """Introduce natural contractions at ~15% rate to break formal AI patterns."""
+def apply_contractions(text: str, rate: float = 0.12) -> str:
     sentences = split_sentences(text)
     processed = []
     for sent in sentences:
         if random.random() < rate and not is_markdown_heading(sent) and not is_markdown_list(sent):
-            # Apply 1-2 random contractions
             applied = 0
             items = list(_CONTRACTIONS.items())
             random.shuffle(items)
             for full, contracted in items:
                 if full in sent.lower() and applied < 2:
-                    # Case-insensitive replacement, preserve original case pattern
                     pattern = re.compile(re.escape(full), re.IGNORECASE)
                     sent = pattern.sub(contracted, sent, count=1)
                     applied += 1
@@ -373,8 +378,7 @@ def apply_contractions(text: str, rate: float = 0.15) -> str:
     return " ".join(processed)
 
 
-def apply_informal_markers(text: str, rate: float = 0.08) -> str:
-    """Add occasional natural human markers that AI avoids."""
+def apply_informal_markers(text: str, rate: float = 0.06) -> str:
     sentences = split_sentences(text)
     processed = []
     
@@ -397,9 +401,8 @@ def apply_informal_markers(text: str, rate: float = 0.08) -> str:
             and not is_markdown_heading(sent) 
             and not is_markdown_list(sent)
             and random.random() < rate
-            and i > 0):  # Never first sentence
+            and i > 0):
             starter = random.choice(informal_starters)
-            # Lowercase first word of original
             if sent[0].isupper():
                 rest = sent[0].lower() + sent[1:]
             else:
@@ -410,23 +413,18 @@ def apply_informal_markers(text: str, rate: float = 0.08) -> str:
 
 
 def vary_punctuation(text: str) -> str:
-    """Break uniform punctuation patterns with natural variation."""
     sentences = split_sentences(text)
     processed = []
     
     for i, sent in enumerate(sentences):
-        # Occasional question instead of statement (rare, natural)
         if i > 0 and i % 12 == 7 and "?" not in sent and len(sent.split()) < 15:
             if random.random() < 0.3:
-                # Convert a short declarative to rhetorical question
                 words = sent.split()
                 if len(words) > 5 and words[0].lower() in {"this", "that", "these", "those", "it"}:
                     sent = sent.rstrip(".") + "?"
         
-        # Occasional dash usage (sparingly)
         if i % 15 == 3 and len(sent.split()) > 10 and "—" not in sent:
-            if random.random() < 0.2 and "," in sent:
-                # Replace one comma with em-dash for emphasis
+            if random.random() < 0.2 and ", " in sent:
                 parts = sent.rsplit(", ", 1)
                 if len(parts) == 2 and len(parts[1].split()) > 3:
                     sent = parts[0] + " — " + parts[1]
@@ -436,7 +434,6 @@ def vary_punctuation(text: str) -> str:
 
 
 def break_uniform_rhythm(text: str) -> str:
-    """Introduce sentence length chaos — the #1 ZeroGPT bypass signal."""
     sentences = split_sentences(text)
     if len(sentences) < 3:
         return text
@@ -446,9 +443,7 @@ def break_uniform_rhythm(text: str) -> str:
         words = sent.split()
         count = len(words)
         
-        # Force extreme variation every few sentences
         if i % 7 == 3 and count > 8:
-            # Create a very short punchy sentence
             short = " ".join(words[:min(4, count)])
             short = _safe_end(short)
             if _has_verb(short.split()):
@@ -456,7 +451,6 @@ def break_uniform_rhythm(text: str) -> str:
                 continue
         
         elif i % 11 == 5 and count < 10:
-            # Elongate a short sentence with natural continuation
             continuations = [
                 ", which follows from the above.",
                 ", as one would expect.",
@@ -470,7 +464,7 @@ def break_uniform_rhythm(text: str) -> str:
     return " ".join(processed)
 
 
-# ===== JOURNAL REGISTER (minimal) =====
+# ===== JOURNAL REGISTER =====
 
 _JOURNAL_SYNONYMS = {
     r"\bshows\b": ["demonstrates", "indicates", "reveals"],
@@ -614,7 +608,7 @@ def local_humanize(sent: str, index: int = 0) -> str:
     return h
 
 
-# ===== SYSTEM PROMPT (anti-detection focused) =====
+# ===== SYSTEM PROMPT =====
 
 SYSTEM = """You are a human academic writer. Rewrite the provided text so it reads exactly like natural human-written academic prose — the kind a real student or researcher would submit.
 
@@ -666,7 +660,7 @@ CRITICAL ANTI-DETECTION RULES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT FORMAT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Output ONLY valid JSON:
+Output ONLY valid JSON. Ensure all quotes inside strings are properly escaped with backslash. Never use unescaped quotes inside JSON values.
 {"processed_paragraphs":[{"sentences":[{"original":"exact original text","humanized":"your rewrite","alternatives":["alt1","alt2","alt3"]}]}]}
 
 Each alternative must be structurally different — not just synonym swaps."""
@@ -678,7 +672,6 @@ def robust_json_extract(text: str) -> dict:
     """Extract valid JSON from potentially malformed LLM output."""
     text = text.strip()
     
-    # Remove markdown fences
     if text.startswith("```json"):
         text = text[7:]
     if text.startswith("```"):
@@ -687,13 +680,11 @@ def robust_json_extract(text: str) -> dict:
         text = text[:-3]
     text = text.strip()
     
-    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
     
-    # Find outermost braces
     start = text.find("{")
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
@@ -702,15 +693,12 @@ def robust_json_extract(text: str) -> dict:
         except json.JSONDecodeError:
             pass
     
-    # Aggressive repair: fix common LLM JSON errors
-    # Fix unescaped quotes inside strings
     repaired = text[start:end+1] if start != -1 and end != -1 else text
     
-    # Replace problematic patterns
-    # Fix single quotes used as apostrophes inside double-quoted strings
-    repaired = re.sub(r'(?<<=[a-zA-Z])\'(?=[a-zA-Z])', "''", repaired)  # temporarily mark
-    repaired = re.sub(r'\'', '"', repaired)  # convert remaining single quotes
-    repaired = re.sub(r"''", "'", repaired)  # restore apostrophes
+    # Fix unescaped quotes inside strings
+    repaired = re.sub(r'(?<=[a-zA-Z.,;:!?])\'(?=[a-zA-Z])', "__APOS__", repaired)
+    repaired = re.sub(r'\'', '"', repaired)
+    repaired = re.sub(r"__APOS__", "'", repaired)
     
     # Fix trailing commas
     repaired = re.sub(r',\s*}', '}', repaired)
@@ -719,11 +707,20 @@ def robust_json_extract(text: str) -> dict:
     # Fix missing quotes around keys
     repaired = re.sub(r'([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', repaired)
     
+    # Fix unescaped internal quotes
+    def escape_quotes_in_values(match):
+        before = match.group(1)
+        value = match.group(2)
+        escaped = value.replace('"', '\\"')
+        return f'{before}"{escaped}"'
+    
+    repaired = re.sub(r'("(?:original|humanized|alternatives)"\s*:\s*)"(.*?)(?<!\\)"', 
+                      escape_quotes_in_values, repaired, flags=re.DOTALL)
+    
     try:
         return json.loads(repaired)
     except json.JSONDecodeError as e:
         print(f"JSON repair failed: {e}")
-        # Last resort: extract sentence data with regex
         return _fallback_parse(text)
 
 
@@ -731,32 +728,66 @@ def _fallback_parse(text: str) -> dict:
     """Emergency extraction when JSON is completely broken."""
     result = {"processed_paragraphs": []}
     
-    # Try to find sentence pairs with regex
-    pattern = r'"original"\s*:\s*"([^"]+)"\s*,\s*"humanized"\s*:\s*"([^"]+)"'
+    # Try to find original/humanized pairs
+    pattern = r'"original"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"humanized"\s*:\s*"((?:[^"\\]|\\.)*)"'
     matches = re.findall(pattern, text, re.DOTALL)
     
     if matches:
-        # Group into a single paragraph (emergency fallback)
         sentences = []
         for orig, hum in matches:
-            # Clean up escaped quotes
             orig = orig.replace('\\"', '"').replace('\\\\', '\\')
             hum = hum.replace('\\"', '"').replace('\\\\', '\\')
             sentences.append({
                 "original": orig,
                 "humanized": hum,
-                "alternatives": [hum, hum, hum]  # Duplicates as emergency fallback
+                "alternatives": [hum, hum, hum]
             })
         result["processed_paragraphs"].append({"sentences": sentences})
     
     return result
 
 
+# ===== MISTRAL API WITH RETRY =====
+
+def call_mistral_with_retry(messages, max_retries=3, max_tokens=2000):
+    """Call Mistral with exponential backoff on timeout."""
+    for attempt in range(max_retries):
+        try:
+            start_time = time.time()
+            print(f"API call attempt {attempt + 1}/{max_retries} at {time.strftime('%H:%M:%S')}")
+            
+            resp = client.chat.complete(
+                model="mistral-large-latest",
+                messages=messages,
+                temperature=0.65,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+            )
+            
+            elapsed = time.time() - start_time
+            print(f"API call completed in {elapsed:.1f}s")
+            return resp
+            
+        except Exception as e:
+            elapsed = time.time() - start_time if 'start_time' in locals() else 0
+            error_str = str(e).lower()
+            
+            if ("timed out" in error_str or "timeout" in error_str) and attempt < max_retries - 1:
+                wait = 2 ** attempt  # 1, 2, 4 seconds
+                print(f"Timeout after {elapsed:.1f}s, retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                print(f"API call failed after {elapsed:.1f}s: {e}")
+                raise
+    
+    return None
+
+
 # ===== CORRECTION LOOP =====
 
 def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str:
     orig_count = count_words(original)
-    hum_count  = count_words(humanized)
+    hum_count = count_words(humanized)
 
     if abs(orig_count - hum_count) <= 3:
         return humanized
@@ -771,11 +802,10 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
                 f"Output ONLY the corrected sentence. Use contractions naturally. "
                 f"Vary sentence structure. No meta-language. No banned AI phrases."
             )
-            resp = client.chat.complete(
-                model="mistral-large-latest",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-                max_tokens=200,
+            resp = call_mistral_with_retry(
+                [{"role": "user", "content": prompt}],
+                max_retries=2,
+                max_tokens=200
             )
             corrected = resp.choices[0].message.content.strip().strip('"').strip("'")
             if abs(orig_count - count_words(corrected)) <= 3 and _has_verb(corrected.split()):
@@ -789,11 +819,56 @@ def correction_loop(original: str, humanized: str, max_attempts: int = 2) -> str
     return enforce_length_constraint(original, humanized, max_diff=3)
 
 
+# ===== CHUNKED PROCESSING FOR LONG TEXTS =====
+
+def chunk_paragraphs(paragraphs: List[List[str]], max_tokens_per_chunk: int = 2500) -> List[List[List[str]]]:
+    """Split paragraphs into chunks that fit within token limits."""
+    chunks = []
+    current_chunk = []
+    current_token_estimate = 0
+    
+    for para in paragraphs:
+        para_text = " ".join([" ".join(sent) for sent in [para]])
+        para_tokens = estimate_tokens(para_text)
+        
+        if current_token_estimate + para_tokens > max_tokens_per_chunk and current_chunk:
+            chunks.append(current_chunk)
+            current_chunk = [para]
+            current_token_estimate = para_tokens
+        else:
+            current_chunk.append(para)
+            current_token_estimate += para_tokens
+    
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    return chunks
+
+
 # ===== MAIN PROCESSING =====
 
 def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[ParagraphData]:
     print(f"CALLING MISTRAL with {len(paragraphs)} paragraphs")
+    
+    # Check if we need to chunk
+    total_tokens = sum(estimate_tokens(" ".join(p)) for p in paragraphs)
+    print(f"Estimated total tokens: {total_tokens}")
+    
+    if total_tokens > 2500:
+        print("Text too long, using chunked processing")
+        chunks = chunk_paragraphs(paragraphs)
+        all_results = []
+        for chunk_idx, chunk in enumerate(chunks):
+            print(f"Processing chunk {chunk_idx + 1}/{len(chunks)}")
+            chunk_results = _process_chunk(chunk, style)
+            all_results.extend(chunk_results)
+        return all_results
+    
+    return _process_chunk(paragraphs, style)
 
+
+def _process_chunk(paragraphs: List[List[str]], style: str) -> List[ParagraphData]:
+    """Process a single chunk of paragraphs."""
     lines = []
     for i, para in enumerate(paragraphs):
         lines.append(f"Paragraph {i + 1}:")
@@ -805,9 +880,12 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
     mistral_error = None
 
     try:
-        resp = client.chat.complete(
-            model="mistral-large-latest",
-            messages=[
+        prompt_text = "\n".join(lines)
+        prompt_tokens = estimate_tokens(SYSTEM) + estimate_tokens(prompt_text)
+        print(f"Estimated prompt tokens: {prompt_tokens}")
+        
+        resp = call_mistral_with_retry(
+            [
                 {"role": "system", "content": SYSTEM},
                 {
                     "role": "user",
@@ -820,19 +898,20 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                         "Preserve all facts, citations, and technical terms. "
                         "No meta-language. No banned phrases. "
                         "Preserve markdown headings and lists exactly.\n\n"
-                        + "\n".join(lines)
+                        + prompt_text
                     ),
                 },
             ],
-            temperature=0.65,
-            max_tokens=4000,
-            response_format={"type": "json_object"},
+            max_retries=3,
+            max_tokens=2000
         )
+        
         text = resp.choices[0].message.content.strip()
-        print(f"RAW RESPONSE (first 500 chars): {text[:500]}")
+        print(f"RAW RESPONSE (first 300 chars): {text[:300]}...")
         
         data = robust_json_extract(text)
         print("JSON parsed successfully")
+        
     except Exception as e:
         mistral_error = str(e)
         print(f"Mistral FAILED: {e}")
@@ -875,36 +954,21 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 "raw_alts": sent.get("alternatives", [])[:3],
             })
 
-        # Apply anti-detection layers in specific order
         for j, sent_data in enumerate(para_sentences):
             h = sent_data["hum"]
             
-            # Layer 1: Break uniform rhythm (sentence length chaos)
             h = break_uniform_rhythm(h)
-            
-            # Layer 2: Natural contractions
             h = apply_contractions(h, rate=0.12)
-            
-            # Layer 3: Occasional informal markers
             h = apply_informal_markers(h, rate=0.06)
-            
-            # Layer 4: Punctuation variation
             h = vary_punctuation(h)
-            
-            # Layer 5: Gentle repetition cleanup
             h = eliminate_repetition(h)
-            
-            # Layer 6: Minimal register upgrade
             h = upgrade_journal_register(h)
-            
-            # Layer 7: Final length and safety
             h = enforce_length_constraint(sent_data["orig"], h, max_diff=5)
             h = re.sub(r"\s{2,}", " ", h)
             h = _safe_end(h.strip())
             
             score = score_sentence(h)
 
-            # Process alternatives
             clean_alts = []
             for idx, alt in enumerate(sent_data["raw_alts"]):
                 alt = alt or local_humanize(sent_data["orig"], idx + 100)
@@ -919,7 +983,6 @@ def humanize_with_mistral(paragraphs: List[List[str]], style: str) -> List[Parag
                 alt = _safe_end(alt.strip())
                 clean_alts.append(alt)
 
-            # Deduplicate
             orig_lower = sent_data["orig"].lower().strip()
             unique_alts: List[str] = []
             seen_lowers: set = set()
